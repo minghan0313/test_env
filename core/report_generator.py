@@ -25,6 +25,10 @@ class ReportGenerator:
         """
         all_data 结构: { "00:00:00": {"NORTH_4": [烟气, 粉尘, SO2, NOx], ...}, ... }
         """
+
+        # 直接使用 config 里的配置，脱离大模型也能一眼看懂
+        from config import DEVICE_EXCEL_COLS, THRESHOLDS
+        
         # 加载工作簿
         wb = ExcelProcessor.load_workbook(template_path)
         ws = wb.active

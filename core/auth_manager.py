@@ -3,9 +3,35 @@ import random
 from playwright.sync_api import sync_playwright
 from utils.image_tool import save_base64_img
 from utils.captcha_solver import CaptchaSolver
+from utils.token_manager import TokenManager
+from core.data_fetcher import DataFetcher
 import config
 
 class AuthManager:
+    #将main中的本地从保存的Token验证逻辑放入到core中，降低main的耦合
+    @classmethod
+    def get_local_token(cls):
+        #统一获取Token的入口
+        # 1、查是否有保存的Token 2、验证是否有效 3、失败就调用UI登录重新获取并写入本地
+        cached_token = TokenManager.get_token()
+        if cached_token:
+            print("正在验证本地Token有效性...")
+            try:
+                #使用配置中的设备进行验证
+                test_res = DataFetcher.fetch_online_data(cached_token,config.DEVICES["SOUTH_2"],"2025-01-01 00:00:00","2025-01-01 00:05:00")
+                if test_res is not None:
+                    print("本地缓存有效，跳过浏览器登录")
+                    return cached_token
+            except Exception as e:
+                print("网站服务出现异常")
+        #2、缓存部存在或失效，执行UI自动化登录
+        print("正在重新登录获取新的Token...")
+        new_token= cls.get_access_token()
+        if new_token:
+            TokenManager.save_token(new_token)
+            print("新Token已经写入缓存")
+            return new_token
+
     @classmethod
     def get_access_token(cls):
         """执行登录流程，成功返回token，失败返回None"""

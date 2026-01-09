@@ -35,3 +35,14 @@ DATA_TYPES = {
     "HOUR" : "2061",
 }
 
+# 环保限值
+THRESHOLDS = {
+    "dust": 10.0, "so2": 35.0, "nox": 50.0
+}
+# 设备与Excel列的映射 (这样修改报表格式非常直观)
+DEVICE_EXCEL_COLS = {
+    "NORTH_4": ["N", "O", "P", "Q"],
+    "NORTH_5": ["R", "S", "T", "U"],
+    "SOUTH_1": ["V", "W", "X", "Y"],
+    "SOUTH_2": ["Z", "AA", "AB", "AC"]
+}
