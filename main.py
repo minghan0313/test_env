@@ -24,8 +24,8 @@ def main():
     raw_data = DataFetcher.fetch_online_data(
         token, 
         config.DEVICES["SOUTH_1"], 
-        "2026-01-07 00:00:00", 
-        "2026-01-08 00:00:00",
+        "2026-01-09 00:00:00", 
+        "2026-01-09 23:00:00",
         config.DATA_TYPES["HOUR"]
     )
     print(raw_data)

@@ -3,7 +3,6 @@ import datetime
 
 class ReportGenerator:
     """环保报表业务生成器：负责业务逻辑映射"""
-
     # 映射表格列：北厂4炉从N列开始, 北厂5炉从R列开始, 南厂1从V, 南厂2从Z
     # 每个炉子占4列：烟气量, 粉尘, SO2, NOx
     COLUMN_MAPPING = {
@@ -12,33 +11,26 @@ class ReportGenerator:
         "SOUTH_1": ["V", "W", "X", "Y"],
         "SOUTH_2": ["Z", "AA", "AB", "AC"]
     }
-
     # 环保限值定义
     THRESHOLDS = {
         "dust": 10.0,  # 粉尘限值
         "so2": 35.0,   # SO2限值
         "nox": 50.0    # NOx限值
     }
-
     @classmethod
     def generate_daily_report(cls, template_path, output_path, all_data):
         """
         all_data 结构: { "00:00:00": {"NORTH_4": [烟气, 粉尘, SO2, NOx], ...}, ... }
         """
-
         # 直接使用 config 里的配置，脱离大模型也能一眼看懂
         from config import DEVICE_EXCEL_COLS, THRESHOLDS
-        
         # 加载工作簿
         wb = ExcelProcessor.load_workbook(template_path)
         ws = wb.active
-
         print(f"开始处理报表，数据源共包含 {len(all_data)} 个时段...")
-
         # 1. 遍历表格的时间行（假设从第4行到27行对应00:00到23:00）
         for row_idx in range(4, 28):
             cell_value = ws[f"A{row_idx}"].value
-            
             # 时间格式预处理：将 Excel 的 time 对象或字符串统一转为 "HH:MM:SS"
             time_key = None
             if isinstance(cell_value, datetime.time):
@@ -81,4 +73,4 @@ class ReportGenerator:
 
         # 保存结果
         ExcelProcessor.save(wb, output_path)
-        print(f"✅ 报表生成成功，超标数据已自动标红：{output_path}")
+        print(f"报表生成成功，超标数据已自动标红：{output_path}")
