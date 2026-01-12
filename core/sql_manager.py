@@ -47,7 +47,7 @@ class SQLManager:
                 data_tuple = (
                     entry.get('time'),
                     boiler_name,
-                    entry.get('a21001-otherFlag', '-'), # 对应 status
+                    entry.get('stop-stopDcsType', '-'), # 对应 status
                     entry.get('a00000-cou', 0), # 对应 total
                     entry.get('a21026-cou', 0),          # 对应 nox
                     entry.get('a21002-cou', 0),          # 对应 so2

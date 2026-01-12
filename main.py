@@ -1,4 +1,3 @@
-import config
 from core.collection_engine import CollectionEngine
 from core.auth_manager import AuthManager
 

@@ -53,8 +53,8 @@ DEVICE_EXCEL_COLS = {
 DB_PATH = os.path.join(BASE_PATH, "emission_storage.db")
 # 采集策略
 FETCH_DELAY_SECONDS = 45  # 每分钟的第45秒发起请求，确保服务端数据已生成
-RETRY_COUNT = 3           # 网络异常重试次数
-RETRY_INTERVAL = 5        # 重试间隔（秒）
+RETRY_COUNT = 7           # 网络异常重试次数
+RETRY_INTERVAL = 60        # 重试间隔（秒）
 
 # 核心指标映射 (根据你之前提供的 JSON 键位)
 # a21026: NOx, a21002: SO2, a34013/a21001: 烟尘/粉尘
