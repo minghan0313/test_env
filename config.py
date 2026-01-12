@@ -46,3 +46,26 @@ DEVICE_EXCEL_COLS = {
     "SOUTH_1": ["V", "W", "X", "Y"],
     "SOUTH_2": ["Z", "AA", "AB", "AC"]
 }
+
+
+
+# 数据库文件路径
+DB_PATH = os.path.join(BASE_PATH, "emission_storage.db")
+# 采集策略
+FETCH_DELAY_SECONDS = 45  # 每分钟的第45秒发起请求，确保服务端数据已生成
+RETRY_COUNT = 3           # 网络异常重试次数
+RETRY_INTERVAL = 5        # 重试间隔（秒）
+
+# 核心指标映射 (根据你之前提供的 JSON 键位)
+# a21026: NOx, a21002: SO2, a34013/a21001: 烟尘/粉尘
+CORE_PARAMS = {
+    "Recordtime":"a00000-rt",   #时间
+    "Status":"stop-stopDcsType",    #锅炉状态
+    "Total":"a00000-cou",  #烟气排放量
+    "Dust": "a34013-cou",   #粉尘量
+    "SO2": "a21026-cou",    #SO2量
+    "NOx": "a21002-cou",    #NOX量
+}
+
+# 所有的锅炉列表 (保持你原有的 DEVICES 结构即可)
+# 如果 DataFetcher 需要 port_id，请确保 DEVICES 字典完整

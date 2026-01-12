@@ -4,7 +4,7 @@ import config
 
 class DataFetcher:
     @staticmethod
-    def fetch_online_data(token, port_id, start_time, end_time, data_type="2051"):
+    def fetch_online_data(token, port_id, start_time, end_time, data_type=config.DATA_TYPES["HOUR"]):
         """
         根据 Token 获取指定的在线监控数据
         """
@@ -17,7 +17,6 @@ class DataFetcher:
             # "Referer": "http://27.191.132.93:9191/psIndex/dataQuery?tab=dataQuery",  #POST请求的时候不需要这个header信息
             "User-Agent": config.USER_AGENT # 建议放进 config
         }
-        print(headers)
         payload = {
             "portTypeId": "port_type2",
             "portId": port_id,
@@ -30,7 +29,7 @@ class DataFetcher:
             "allTime": None,
             "psId": "259556ea91e848b08f8fbad7df00d9d1"
         }
-        print(payload)
+        #print(payload)
         response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code == 200:
