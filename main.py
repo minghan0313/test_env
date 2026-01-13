@@ -19,7 +19,7 @@ def main():
     try:
         # 3. 启动补课逻辑 (同步执行)
         # 这一步会根据数据库 MAX(time) 自动追平所有历史缺失数据
-        engine.run_sync() 
+        engine.sync_hourly() 
         
         # 4. 启动实时采集服务 (持久运行)
         # 这里会进入你设计的每小时 02 分执行的死循环

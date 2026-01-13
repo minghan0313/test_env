@@ -20,8 +20,10 @@ class CollectionEngine:
         self.fetcher = DataFetcher()
     #根据时间、设备名称、报表类型来存储单条数据，目前默认是存储小时报表，但是后续肯定得有分钟报表。
     #而且分钟报表和小时报表的数据结构不同，肯定是要做筛选的
+    
     def fetch_and_store(self, target_time, name, port_id,data_type):
         """执行单次数据抓取与入库"""
+
         """增强版：带有数据质量校验的抓取"""
         token = AuthManager.get_local_token()
         #小时报表的开始和结束时间设置。
@@ -33,12 +35,17 @@ class CollectionEngine:
         # #end_time比起始时间多5分钟。起始时间是11:00的话，结束时间就是11:05
         # end_time = end_time_obj.strftime('%Y-%m-%d %H:%M:%S')
 
+
         if data_type == config.DATA_TYPES["HOUR"]:
+            # 窗口补偿delay：小时报表延迟通常比分钟报表长
             # 小时报表：延后5分钟以确保数据已生成
-            end_time = (target_time + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+            delay = 5
+            end_time = (target_time + timedelta(minutes=delay)).strftime('%Y-%m-%d %H:%M:%S')
         else:
             # 分钟报表：经过实际观察，每台锅炉的分钟报表延后时间不等，最长的延后5分钟
-            end_time = (target_time + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+            # 小时报表：延后5分钟以确保数据已生成
+            delay = 2 
+            end_time = (target_time + timedelta(minutes=delay)).strftime('%Y-%m-%d %H:%M:%S')
 
 
         #异常重试逻辑
@@ -62,7 +69,7 @@ class CollectionEngine:
                     # 如果 stop_type 不为 "-"，说明是【已知停机】状态
                     if stop_type != "-":
                         logging.info(f"[{name}] {begin_time} 设备停机({stop_type})，允许空数据入库")
-                        self.db.save_entry(name, entry)
+                        self.db.save_entry(name, entry,config.DATA_TYPES['HOUR'])
                         return True
                     # 如果是正常运行状态 (stop_type == "-")
                     else:
@@ -74,10 +81,10 @@ class CollectionEngine:
                             # 不 return，进入下一次循环重试
                         else:
                             # 数据正常，写入数据库
-                            self.db.save_entry(name, entry)
+                            self.db.save_entry(name, entry,config.DATA_TYPES['HOUR'])
                             logging.info(f"[{name}] {begin_time} 数据采集并校验成功")
                             return True
-                    self.db.save_entry(name, data_list[0])
+                    self.db.save_entry(name, data_list[0],config.DATA_TYPES['HOUR'])
                     return True
                 else:
                     print(f"[{name}] {begin_time} 暂无数据更新")
@@ -89,41 +96,55 @@ class CollectionEngine:
             time.sleep(config.RETRY_INTERVAL)
         return False
 
-    def run_sync(self):
-        """自动补全逻辑（补课模式）"""
+    def sync_hourly(self):
         logging.info(">>> 正在检查历史数据完整性...")
-        # 核心修正：
-        # 如果现在是 14:40，now 变成 14:00
-        # latest_available 变成 13:00
-        # 这确保了补课逻辑最高只补到网站已生成的最新小时数据
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
         latest_available = now - timedelta(hours=1)
 
         for name, port_id in self.devices.items():
-            # 获取数据库最后一条小时数据的时间
-            last_time = self.db.get_last_time(name) 
-            
-            # 如果没数据，默认补最近 24 小时
+            last_time = self.db.get_last_time(name,config.DATA_TYPES['HOUR']) 
             if not last_time:
                 last_time = latest_available - timedelta(hours=24)
             
-            # 补齐从最后时间到当前小时的所有缺口
             check_time = last_time + timedelta(hours=1)
-            # 修改点：while 条件从 <= now 改为 <= latest_available
-            #while check_time <= now:
             while check_time <= latest_available:
                 logging.info(f"正在补齐 {name} 历史数据: {check_time}")
                 success = self.fetch_and_store(check_time, name, port_id, config.DATA_TYPES["HOUR"])
-                if not success:
-                    # 如果补课失败，跳过该小时或记录错误，不阻塞后续流程
-                    print(f"无法补齐 {name} {check_time} 的数据")
-                    logging.error(f"无法补齐 {name} {check_time} 的数据")
-                check_time += timedelta(hours=1)
-        
-        logging.info(">>> 历史数据对齐完成。")   
+                
+                if success:
+                    # 只有成功了才继续往后走
+                    check_time += timedelta(hours=1)
+                else:
+                    # 如果这个时间点死活采不到（比如网站还没出数），
+                    # 停止补齐当前设备，防止后面全是空跑，等下次轮询再试
+                    logging.warning(f"[{name}] {check_time} 补齐中断，等待下次同步")
+                    break 
+        logging.info(">>> 历史数据自检完成。")
 
+
+    def sync_minutes(self, start_time, end_time):
+        """同步指定时段的分钟均值数据 (批量模式)"""
+        begin_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
+        end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
+        token = AuthManager.get_local_token()
+        data_type = config.DATA_TYPES["MINUTE"]
+
+        for name, port_id in self.devices.items():
+            try:
+                # 一次性获取该时段所有分钟数据
+                data_list = self.fetcher.fetch_online_data(
+                    token, port_id, begin_str, end_str, data_type
+                )
+                if data_list:
+                    count = 0
+                    for entry in data_list:
+                        if self.db.save_entry(name, entry, data_type):
+                            count += 1
+                    logging.info(f"[{name}] 批量补录 {count} 条分钟数据")
+            except Exception as e:
+                logging.error(f"[{name}] 分钟数据同步失败: {e}")
     def start_service(self):
-            self.run_sync() # 启动先补历史数据
+            self.sync_hourly() # 启动先补历史数据
             
             logging.info(">>> 后台采集服务已启动...")
             while True:
