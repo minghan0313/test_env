@@ -63,7 +63,7 @@ class AuthManager:
                 time.sleep(1) # 等待图片加载完毕
                 
                 bg_src = page.evaluate('document.querySelector(".SVdivimg02 img").src')
-                tmp_path = "utils/temp_captcha.png"
+                tmp_path = "../utils/temp_captcha.png"
                 save_base64_img(bg_src, tmp_path)
                 
                 # 识别距离
