@@ -1,12 +1,13 @@
 import sqlite3
 import json
-import config
+import core.settings as settings
 from datetime import datetime
 import logging
 
 class SQLManager:
     def __init__(self):
-        self.db_path = config.DB_PATH
+        self.db_path = settings.DB_PATH
+        print(self.db_path)
         self._init_db()
 
     def _init_db(self):
@@ -53,7 +54,7 @@ class SQLManager:
         data_type: 传入 config.DATA_TYPES["HOUR"] 或 config.DATA_TYPES["MINUTE"]
         """
 
-        if data_type == config.DATA_TYPES["HOUR"] :
+        if data_type == settings.DATA_TYPES["HOUR"] :
             print("写入小时表")
             return self._save_entry_hour(boiler_name, entry)
         else:
@@ -158,7 +159,7 @@ class SQLManager:
         
     def get_last_time(self, boiler_name, data_type):
         """修正后的获取最后记录时间方法"""
-        table = "boiler_data_hour" if data_type == config.DATA_TYPES["HOUR"] else "boiler_data_minute"
+        table = "boiler_data_hour" if data_type == settings.DATA_TYPES["HOUR"] else "boiler_data_minute"
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -178,7 +179,7 @@ class SQLManager:
     #如果你的逻辑是“从最后时间往后采”，那么 11:00 的数据将永远丢失。
     def get_existing_timestamps(self, boiler_name, start_time, end_time, data_type):
             """查询指定时间段内，数据库已存在的记录时间点"""
-            table = "boiler_data_hour" if data_type == config.DATA_TYPES["HOUR"] else "boiler_data_minute"
+            table = "boiler_data_hour" if data_type == settings.DATA_TYPES["HOUR"] else "boiler_data_minute"
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     cursor = conn.cursor()

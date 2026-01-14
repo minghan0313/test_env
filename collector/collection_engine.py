@@ -1,11 +1,19 @@
 import time
 import logging
 from datetime import datetime, timedelta
-import config
-from core.auth_manager import AuthManager
-from core.data_fetcher import DataFetcher
-from core.sql_manager import SQLManager
 
+#引用上层目录core的代码文件
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).resolve().parents[1])
+
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+from collector.auth_manager import AuthManager
+from data_fetcher import DataFetcher
+from core.sql_manager import SQLManager
+from core import settings  # 导入模块本身
 
 # 配置日志，方便后台服务排查
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,7 +23,7 @@ class CollectionEngine:
         #SQLManager类的引用
         self.db = SQLManager()
         #配置文件的引用
-        self.devices = config.DEVICES 
+        self.devices = settings.DEVICES 
         #DataFetcher类的引用
         self.fetcher = DataFetcher()
     #根据时间、设备名称、报表类型来存储单条数据，目前默认是存储小时报表，但是后续肯定得有分钟报表。
@@ -65,7 +73,7 @@ class CollectionEngine:
         # end_time = end_time_obj.strftime('%Y-%m-%d %H:%M:%S')
 
 
-        if data_type == config.DATA_TYPES["HOUR"]:
+        if data_type == settings.DATA_TYPES["HOUR"]:
             # 窗口补偿delay：小时报表延迟通常比分钟报表长
             # 小时报表：延后5分钟以确保数据已生成
             delay = 5
@@ -140,14 +148,14 @@ class CollectionEngine:
         latest_available = now - timedelta(hours=1)
 
         for name, port_id in self.devices.items():
-            last_time = self.db.get_last_time(name,config.DATA_TYPES['HOUR']) 
+            last_time = self.db.get_last_time(name,settings.DATA_TYPES['HOUR']) 
             if not last_time:
                 last_time = latest_available - timedelta(hours=24)
             
             check_time = last_time + timedelta(hours=1)
             while check_time <= latest_available:
                 logging.info(f"正在补齐 {name} 历史数据: {check_time}")
-                success = self.fetch_and_store(check_time, name, port_id, config.DATA_TYPES["HOUR"])
+                success = self.fetch_and_store(check_time, name, port_id, settings.DATA_TYPES["HOUR"])
                 
                 if success:
                     # 只有成功了才继续往后走
@@ -165,7 +173,7 @@ class CollectionEngine:
         begin_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
         end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
         token = AuthManager.get_local_token()
-        data_type = config.DATA_TYPES["MINUTE"]
+        data_type = settings.DATA_TYPES["MINUTE"]
 
         for name, port_id in self.devices.items():
             try:
@@ -193,7 +201,7 @@ class CollectionEngine:
 
                 for name, port_id in self.devices.items():
                     # 1. 小时报表扫盲
-                    h_type = config.DATA_TYPES["HOUR"]
+                    h_type = settings.DATA_TYPES["HOUR"]
                     existing_set = self.db.get_existing_timestamps(name, check_start, check_end, h_type)
                     
                     curr = check_start

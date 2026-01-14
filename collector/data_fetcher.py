@@ -1,20 +1,29 @@
 import requests
-import config
+
+#引用上层目录core的代码文件
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).resolve().parents[1])
+
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+from core import settings  # 导入模块本身
 
 class DataFetcher:
     @staticmethod
-    def fetch_online_data(token, port_id, start_time, end_time, data_type=config.DATA_TYPES["HOUR"]):
+    def fetch_online_data(token, port_id, start_time, end_time, data_type=settings.DATA_TYPES["HOUR"]):
         """
         根据 Token 获取指定的在线监控数据
         """
-        url = config.POST_URL  # 建议放进 config
+        url = settings.POST_URL  # 建议放进 config
         
         headers = {
             "Authorization": f"bearer {token}",
             "Content-Type": "application/json",
             # "Origin": "http://27.191.132.93:9191",    #POST请求的时候不需要这个header信息
             # "Referer": "http://27.191.132.93:9191/psIndex/dataQuery?tab=dataQuery",  #POST请求的时候不需要这个header信息
-            "User-Agent": config.USER_AGENT # 建议放进 config
+            "User-Agent": settings.USER_AGENT # 建议放进 config
         }
         payload = {
             "portTypeId": "port_type2",

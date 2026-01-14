@@ -1,0 +1,8 @@
+# 忽略 Python 编译字节码
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 忽略 VS Code 配置（如果你不想分享你的个人 IDE 设置）
+.vscode/

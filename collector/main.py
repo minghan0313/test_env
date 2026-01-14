@@ -1,5 +1,18 @@
-from core.collection_engine import CollectionEngine
-from core.auth_manager import AuthManager
+# collector/main.py 的最顶部
+import sys
+from pathlib import Path
+
+# 获取当前文件的爷爷目录（即项目根目录）
+# __file__ 是 collector/main.py
+# .resolve().parents[1] 就是项目根目录 Auto/
+root_path = str(Path(__file__).resolve().parents[1])
+
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+# 之后的引用永远使用“包名.模块名”
+from auth_manager import AuthManager
+from collection_engine import CollectionEngine
 
 def main():
     print("=== 环保数据采集后台服务启动 ===")

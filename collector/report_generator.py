@@ -1,6 +1,14 @@
 from utils.excel_tool import ExcelProcessor
 import datetime
 
+#引用上层目录core的代码文件
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).resolve().parents[1])
+
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+from core import settings
 class ReportGenerator:
     """环保报表业务生成器：负责业务逻辑映射"""
     # 映射表格列：北厂4炉从N列开始, 北厂5炉从R列开始, 南厂1从V, 南厂2从Z
@@ -23,7 +31,6 @@ class ReportGenerator:
         all_data 结构: { "00:00:00": {"NORTH_4": [烟气, 粉尘, SO2, NOx], ...}, ... }
         """
         # 直接使用 config 里的配置，脱离大模型也能一眼看懂
-        from config import DEVICE_EXCEL_COLS, THRESHOLDS
         # 加载工作簿
         wb = ExcelProcessor.load_workbook(template_path)
         ws = wb.active

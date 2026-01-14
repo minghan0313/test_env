@@ -4,21 +4,31 @@ from playwright.sync_api import sync_playwright
 from utils.image_tool import save_base64_img
 from utils.captcha_solver import CaptchaSolver
 from utils.token_manager import TokenManager
-from core.data_fetcher import DataFetcher
-import config
+from data_fetcher import DataFetcher
+import sys
+from pathlib import Path
+
+# 获取当前文件的爷爷目录（即项目根目录）
+# __file__ 是 collector/main.py
+# .resolve().parents[1] 就是项目根目录 Auto/
+root_path = str(Path(__file__).resolve().parents[1])
+
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+from core import settings  # 导入模块本身
 
 class AuthManager:
     #将main中的本地从保存的Token验证逻辑放入到core中，降低main的耦合
     @classmethod
     def get_local_token(cls):
-        #统一获取Token的入口
+        #统一获取Token的入口    
         # 1、查是否有保存的Token 2、验证是否有效 3、失败就调用UI登录重新获取并写入本地
         cached_token = TokenManager.get_token()
         if cached_token:
             print("正在验证本地Token有效性...")
             try:
                 #使用配置中的设备进行验证
-                test_res = DataFetcher.fetch_online_data(cached_token,config.DEVICES["SOUTH_2"],"2025-01-01 00:00:00","2025-01-01 00:05:00")
+                test_res = DataFetcher.fetch_online_data(cached_token,settings.DEVICES["SOUTH_2"],"2025-01-01 00:00:00","2025-01-01 00:05:00")
                 if test_res is not None:
                     print("本地缓存有效，跳过浏览器登录")
                     return cached_token
@@ -43,9 +53,9 @@ class AuthManager:
             
             try:
                 # 2. 登录操作
-                page.goto(config.LOGIN_URL)
-                page.fill('input[formcontrolname="userName"]', config.USER_NAME)
-                page.fill('input[formcontrolname="password"]', config.PASSWORD)
+                page.goto(settings.LOGIN_URL)
+                page.fill('input[formcontrolname="userName"]', settings.USER_NAME)
+                page.fill('input[formcontrolname="password"]', settings.PASSWORD)
                 page.click(".lodin_yanzheng button")
                 
                 # 3. 验证码处理
@@ -53,7 +63,7 @@ class AuthManager:
                 time.sleep(1) # 等待图片加载完毕
                 
                 bg_src = page.evaluate('document.querySelector(".SVdivimg02 img").src')
-                tmp_path = "temp_captcha.png"
+                tmp_path = "utils/temp_captcha.png"
                 save_base64_img(bg_src, tmp_path)
                 
                 # 识别距离
@@ -70,7 +80,7 @@ class AuthManager:
                 # 4. 提交并等待跳转
                 page.wait_for_timeout(1000)
                 page.click(".login-form-button")
-                page.wait_for_url(config.TARGET_URL, timeout=10000)
+                page.wait_for_url(settings.TARGET_URL, timeout=10000)
                 
                 # 5. 提取Token
                 token = cls._retry_get_local_storage(page, "token")

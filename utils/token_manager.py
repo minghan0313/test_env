@@ -6,16 +6,16 @@ class TokenManager:
     工业级 Token 持久化工具
     自动处理跨平台路径，确保 Token 存储在项目根目录下
     """
-    # --- 路径逻辑开始 ---
+# --- 路径逻辑开始 ---
     # 1. 获取当前文件 (token_manager.py) 的绝对路径
     _current_file_path = os.path.abspath(__file__)
-    # 2. 获取 utils 文件夹的路径
+    # 2. 获取当前文件所在的文件夹路径 (即 utils/ 文件夹)
     _utils_dir = os.path.dirname(_current_file_path)
-    # 3. 获取项目的根目录 (utils 的上一级)
-    _root_dir = os.path.dirname(_utils_dir)
-    # 4. 拼接最终的 Token 缓存文件路径 (使用隐藏文件 .token_cache.json)
-    TOKEN_FILE = os.path.join(_root_dir, "token_cache.json")
+    # 3. 拼接最终的 Token 缓存文件路径
+    # 如果想放在同级目录，直接使用 _utils_dir
+    TOKEN_FILE = os.path.join(_utils_dir, "token_cache.json")
     # --- 路径逻辑结束 ---
+    
     @classmethod
     def get_token(cls):
         """

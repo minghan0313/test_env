@@ -3,10 +3,9 @@ import os
 # 基础路径
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 IMAGE_DIR = os.path.join(BASE_PATH, "test_img")
-
-# 确保图片文件夹存在
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
+# # 确保图片文件夹存在
+# if not os.path.exists(IMAGE_DIR):
+#     os.makedirs(IMAGE_DIR)
 
 # 目标信息
 LOGIN_URL = "http://27.191.132.93:9090/login"
@@ -48,9 +47,22 @@ DEVICE_EXCEL_COLS = {
 }
 
 
-
+# 1. 获取当前 settings.py 的绝对路径
+# C:\Users\...\Auto\core\settings.py
+current_file_path = os.path.abspath(__file__)
+# 2. 获取项目根目录 (Auto/)
+# .dirname 两次，从 core/ 退到 Auto/
+BASE_PATH = os.path.dirname(os.path.dirname(current_file_path))
+# 3. 定义数据库存放目录
+DB_DIR = os.path.join(BASE_PATH, "db")
+# 4. 自动创建 db 目录（防止第一次运行时报错）
+if not os.path.exists(DB_DIR):
+    os.makedirs(DB_DIR)
+# 5. 最终的数据库路径
+# C:\Users\...\Auto\db\emission_storage.db
+DB_PATH = os.path.join(DB_DIR, "data.db")
 # 数据库文件路径
-DB_PATH = os.path.join(BASE_PATH, "emission_storage.db")
+#DB_PATH = os.path.join(BASE_PATH, "emission_storage.db")
 # 采集策略
 FETCH_DELAY_SECONDS = 45  # 每分钟的第45秒发起请求，确保服务端数据已生成
 RETRY_COUNT = 7           # 网络异常重试次数
