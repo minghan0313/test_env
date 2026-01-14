@@ -1,6 +1,7 @@
 import sys
 import os
 from fastapi import FastAPI, Query, Body
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -19,6 +20,15 @@ class LimitUpdate(BaseModel):
     value: float
 
 app = FastAPI(title="环保排放监控系统 API", version="1.2.0")
+# 在 app = FastAPI() 之后添加
+#默认情况下，浏览器会阻止 3000 端口（前端）访问 8000 端口（后端）。
+#需要设置为允许跨域
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 允许所有来源
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 db = SQLManager()
 
 @app.get("/")

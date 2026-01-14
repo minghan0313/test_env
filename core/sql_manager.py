@@ -1,7 +1,8 @@
 import sqlite3
 import json
 import core.settings as settings
-from datetime import datetime
+# 修改这一行，增加 timedelta
+from datetime import datetime, timedelta
 import logging
 
 class SQLManager:
