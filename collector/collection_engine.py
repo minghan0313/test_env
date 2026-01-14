@@ -167,31 +167,80 @@ class CollectionEngine:
                     break 
         logging.info(">>> 历史数据自检完成。")
 
-
-    def sync_minutes(self, start_time, end_time):
-        """同步指定时段的分钟均值数据 (批量模式)"""
+    def sync_minutes(self):
+        """
+        自动同步函数：默认抓取并补录当前时间点前 2 小时内的所有分钟数据。
+        无需外部传参，适合放入定时任务或循环体中。
+        """
+        # 1. 计算时间窗口
+        now = datetime.now()
+        start_time = now - timedelta(hours=2) # 起始点：2小时前
+        end_time = now                        # 结束点：现在
+        
+        # 格式化为 API 所需的字符串格式
         begin_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
         end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 2. 获取令牌和数据类型标记
         token = AuthManager.get_local_token()
         data_type = settings.DATA_TYPES["MINUTE"]
 
+        logging.info(f">>> 开始自动同步分钟数据窗口: {begin_str} 至 {end_str}")
+
+        # 3. 遍历设备进行批量抓取
         for name, port_id in self.devices.items():
             try:
-                # 一次性获取该时段所有分钟数据
+                # 一次性请求该设备在 2 小时内的所有分钟数据（约 120 条）
                 data_list = self.fetcher.fetch_online_data(
                     token, port_id, begin_str, end_str, data_type
                 )
+                
                 if data_list:
                     count = 0
                     for entry in data_list:
-                        if self.db.save_entry(name, entry, data_type):
-                            count += 1
-                    logging.info(f"[{name}] 批量补录 {count} 条分钟数据")
+                        # 获取当前行的时间戳用于日志或校验
+                        entry_time = entry.get('time', 'Unknown')
+                        
+                        # 4. 数据有效性校验：复用你之前提炼的校验函数
+                        # 确保只有结算完成（非 "-"）的数据才入库
+                        if self.is_entry_valid(entry, name, entry_time):
+                            if self.db.save_entry(name, entry, data_type):
+                                count += 1
+                                
+                    logging.info(f"[{name}] 窗口内发现 {len(data_list)} 条数据，成功入库/更新 {count} 条")
+                else:
+                    logging.warning(f"[{name}] 在该时间段内未查询到任何分钟数据")
+                    
             except Exception as e:
-                logging.error(f"[{name}] 分钟数据同步失败: {e}")
+                logging.error(f"[{name}] 分钟数据自动同步发生异常: {e}")
+
+    # def sync_minutes(self, start_time, end_time):
+    #     """同步指定时段的分钟均值数据 (批量模式)"""
+    #     begin_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
+    #     end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
+    #     token = AuthManager.get_local_token()
+    #     data_type = settings.DATA_TYPES["MINUTE"]
+
+    #     for name, port_id in self.devices.items():
+    #         try:
+    #             # 一次性获取该时段所有分钟数据
+    #             data_list = self.fetcher.fetch_online_data(
+    #                 token, port_id, begin_str, end_str, data_type
+    #             )
+    #             if data_list:
+    #                 count = 0
+    #                 for entry in data_list:
+    #                     if self.db.save_entry(name, entry, data_type):
+    #                         count += 1
+    #                 logging.info(f"[{name}] 批量补录 {count} 条分钟数据")
+    #         except Exception as e:
+    #             logging.error(f"[{name}] 分钟数据同步失败: {e}")
     def start_service(self):
-            self.sync_hourly() # 启动先补历史数据
-            
+            self.sync_hourly() # 启动先补全小时历史数据
+            self.sync_minutes()  #启动先补全分钟历史数据
+            # 获取当前实时心跳时间（用于频率计算）
+            last_min_sync = datetime.now() - timedelta(minutes=15)
+
             logging.info(">>> 采集服务启动：由时间驱动改为空档驱动自愈模式...")
             while True:
                 now = datetime.now().replace(minute=0, second=0, microsecond=0)
@@ -212,8 +261,19 @@ class CollectionEngine:
                             self.fetch_and_store(curr, name, port_id, h_type)
                         curr += timedelta(hours=1)
 
-                    # 2. 分钟报表同步 (分钟数据建议依然用 batch 方式，但逻辑类似)
-                    # 每 15 分钟可以执行一次 batch 同步过去 1 小时的数据，覆盖掉可能存在的空档
-
+                #==========================
+                # --- B. 分钟报表滑窗补全 (受 last_min_sync 控制，约每 10 分钟执行一次) ---
+                # 逻辑：判断距离上次分钟同步是否超过 600 秒（10分钟）
+                # 获取当前实时心跳时间（用于频率计算）
+                current_beat = datetime.now()
+                if (current_beat - last_min_sync).total_seconds() >= 600:
+                    logging.info(">>> 触发分钟数据例行同步（过去2小时窗口）...")
+                    
+                    # 调用无参函数，内部会自动计算 [now-2h, now] 范围并批量入库
+                    self.sync_minutes()
+                    
+                    # 更新同步时间戳
+                    last_min_sync = current_beat
+                #==========================
                 logging.info(">>> 本轮扫描完成，5分钟后进行下一轮检测...")
                 time.sleep(300)
