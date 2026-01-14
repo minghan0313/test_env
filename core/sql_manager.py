@@ -170,6 +170,28 @@ class SQLManager:
         except Exception as e:
             logging.error(f"查询最后时间异常({table}): {e}")
             return None
+        
+    #这个函数和上面的get_last_time的功能不是一样的。
+    #get_last_time 只能告诉你“最后一次成功的时间”，但它无法发现“中间断掉的空档”。
+    #中间空档（Gap）：程序运行着，但 11:00 采集时网站报错了，12:00 却采集成功了。
+    #此时 get_last_time 会返回 12:00。
+    #如果你的逻辑是“从最后时间往后采”，那么 11:00 的数据将永远丢失。
+    def get_existing_timestamps(self, boiler_name, start_time, end_time, data_type):
+            """查询指定时间段内，数据库已存在的记录时间点"""
+            table = "boiler_data_hour" if data_type == config.DATA_TYPES["HOUR"] else "boiler_data_minute"
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        f"SELECT time FROM {table} WHERE boiler_name=? AND time BETWEEN ? AND ?",
+                        (boiler_name, start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'))
+                    )
+                    # 返回一个 set，方便后续进行高效的差集运算
+                    return {row[0] for row in cursor.fetchall()}
+            except Exception as e:
+                logging.error(f"查询已有时间戳异常: {e}")
+                return set()
+        
 
     def get_today_total(self, boiler_name, data_type):
         """获取指定表最后一条数据的时间，用于补课自检"""
