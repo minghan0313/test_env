@@ -47,6 +47,16 @@ class SQLManager:
                 )
             ''')
             conn.commit()
+            # 建立系统配置表：存储限值、总量目标等
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sys_limit (
+                    param_name TEXT PRIMARY KEY,
+                    param_value REAL,
+                    update_time DATETIME
+                )
+            ''')
+            conn.commit()
 
     def save_entry(self, boiler_name, entry,data_type):
         """
@@ -194,17 +204,117 @@ class SQLManager:
                 return set()
         
 
-    def get_today_total(self, boiler_name, data_type):
-        """获取指定表最后一条数据的时间，用于补课自检"""
-        table = "boiler_data_hour" if "HOUR" in data_type else "boiler_data_minute"
+    # ==========================================
+    # 2. Web 服务新增逻辑 (新增用于报表和统计)
+    # ==========================================
+    #限值数据表，排放总量限制值和排放率限制值
+    def set_limit(self, key, value):
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # 使用参数化查询防止注入（虽然 metric 是内部传入，但养成好习惯）
-                cursor.execute(f"SELECT MAX(time) FROM {table} WHERE boiler_name=?", (boiler_name,))
-                res = cursor.fetchone()
-                return res[0] if res and res[0] else 0.0
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                cursor.execute(
+                    "INSERT OR REPLACE INTO sys_limit (param_name, param_value, update_time) VALUES (?, ?, ?)",
+                    (key, value, now)
+                )
+                conn.commit()
+                return True
         except Exception as e:
-            print(f"统计累计值异常: {e}")
-            logging.error(f"查询最后记录时间失败({table}): {e}")
-            return 0.0
+            logging.error(f"保存配置[{key}]失败: {e}")
+            return False
+    #读取数据表
+    def get_limit(self, key, default):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT param_value FROM sys_limit WHERE param_name = ?", (key,))
+                res = cursor.fetchone()
+                return res[0] if res else default
+        except Exception as e:
+            logging.error(f"读取配置[{key}]异常: {e}")
+            return default
+
+    def get_today_stats(self):
+        """核心需求：获取今日全厂运行中(status='-')的总排量汇总"""
+        today_start = datetime.now().strftime('%Y-%m-%d 00:00:00')
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row 
+                cursor = conn.cursor()
+                # 统计所有 status 为 '-' 的设备排放总量
+                sql = """
+                    SELECT 
+                        SUM(nox_pf) as total_nox, 
+                        SUM(so2_pf) as total_so2, 
+                        SUM(dust_pf) as total_dust 
+                    FROM boiler_data_hour 
+                    WHERE time >= ? AND status = '-'
+                """
+                cursor.execute(sql, (today_start,))
+                row = cursor.fetchone()
+                return {
+                    "total_nox": row["total_nox"] if row["total_nox"] else 0.0,
+                    "total_so2": row["total_so2"] if row["total_so2"] else 0.0,
+                    "total_dust": row["total_dust"] if row["total_dust"] else 0.0
+                }
+        except Exception as e:
+            logging.error(f"获取今日统计失败: {e}")
+            return {"total_nox": 0.0, "total_so2": 0.0, "total_dust": 0.0}
+
+    def get_last_entry(self, boiler_name, data_type):
+        """获取指定设备最新的一条记录（用于实时监控卡片）"""
+        table = "boiler_data_hour" if data_type == settings.DATA_TYPES["HOUR"] else "boiler_data_minute"
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                sql = f"SELECT * FROM {table} WHERE boiler_name = ? ORDER BY time DESC LIMIT 1"
+                cursor.execute(sql, (boiler_name,))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            logging.error(f"获取最新快照失败: {e}")
+            return None
+
+    def get_recent_trend(self, hours=24):
+        """新增：获取最近 X 小时的全厂排放趋势数据（用于折线图）"""
+        start_time = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                # 按小时分组统计全厂总排放
+                sql = """
+                    SELECT time, SUM(nox_pf) as nox, SUM(so2_pf) as so2, SUM(dust_pf) as dust
+                    FROM boiler_data_hour
+                    WHERE time >= ? AND status = '-'
+                    GROUP BY time
+                    ORDER BY time ASC
+                """
+                cursor.execute(sql, (start_time,))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"趋势查询失败: {e}")
+            return []
+
+    def get_all_boilers_realtime(self):
+        """新增：一次性获取所有锅炉的最新分钟折算值（用于超标报警监视）"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                # 复杂的子查询：获取每台锅炉在分钟表里的最后一条记录
+                sql = """
+                    SELECT a.* FROM boiler_data_minute a
+                    INNER JOIN (
+                        SELECT boiler_name, MAX(time) as max_time
+                        FROM boiler_data_minute
+                        GROUP BY boiler_name
+                    ) b ON a.boiler_name = b.boiler_name AND a.time = b.max_time
+                """
+                cursor.execute(sql)
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"获取实时状态列表失败: {e}")
+            return []
