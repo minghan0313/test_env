@@ -6,9 +6,10 @@ interface CircularGaugeProps {
   emission: number
   unit: string
   color: string
+  limit: number
 }
 
-export function CircularGauge({ label, percentage, emission, unit, color }: CircularGaugeProps) {
+export function CircularGauge({ label, percentage, emission, unit, color, limit }: CircularGaugeProps) {
   const radius = 54
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (percentage / 100) * circumference
@@ -45,7 +46,7 @@ export function CircularGauge({ label, percentage, emission, unit, color }: Circ
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-bold text-foreground">{percentage}%</span>
-          <span className="text-xs text-muted-foreground">of quota</span>
+          <span className="text-xs text-muted-foreground">配额消耗</span>
         </div>
       </div>
       <div className="mt-3 text-center">
@@ -53,7 +54,11 @@ export function CircularGauge({ label, percentage, emission, unit, color }: Circ
           {label}
         </p>
         <p className="text-sm text-muted-foreground">
-          {emission} {unit}
+          排放累计值: {emission} {unit}
+        </p>
+        {/* <p className="text-xs text-muted-foreground/70 mt-0.5"> */}
+        <p className="text-sm text-muted-foreground">
+          今日目标值: {limit} {unit}
         </p>
       </div>
     </div>

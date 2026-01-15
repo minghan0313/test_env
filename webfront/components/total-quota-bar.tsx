@@ -28,10 +28,13 @@ export function TotalQuotaBar({
     <div className="bg-secondary/30 rounded-lg p-4">
       {/* 顶部文字说明栏 */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-muted-foreground">Total Daily Quota Usage</span>
+        {/* <span className="text-sm text-muted-foreground">Total Daily Quota Usage</span> */}
+        <span className="text-sm text-muted-foreground">日排放总配额消耗</span>
+        
         <span className="text-sm font-medium text-foreground">
           {/* 这里直接显示父组件传下来的 limit */}
-          Target: <span className="text-primary">{limit} kg</span>
+          {/* Target: <span className="text-primary">{limit} kg</span> */}
+          今日目标值： <span className="text-primary">{limit} m³</span>
         </span>
       </div>
       {/* 进度条槽（外壳） */}

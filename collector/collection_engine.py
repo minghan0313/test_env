@@ -239,8 +239,8 @@ class CollectionEngine:
             self.sync_hourly() # 启动先补全小时历史数据
             self.sync_minutes()  #启动先补全分钟历史数据
             # 获取当前实时心跳时间（用于频率计算）
-            last_min_sync = datetime.now() - timedelta(minutes=15)
-
+            #last_min_sync = datetime.now() - timedelta(minutes=15)
+            last_min_sync = datetime.now()
             logging.info(">>> 采集服务启动：由时间驱动改为空档驱动自愈模式...")
             while True:
                 now = datetime.now().replace(minute=0, second=0, microsecond=0)
@@ -262,11 +262,13 @@ class CollectionEngine:
                         curr += timedelta(hours=1)
 
                 #==========================
-                # --- B. 分钟报表滑窗补全 (受 last_min_sync 控制，约每 10 分钟执行一次) ---
-                # 逻辑：判断距离上次分钟同步是否超过 600 秒（10分钟）
+                # --- B. 分钟报表滑窗补全 (受 last_min_sync 控制，约
+                # 每 10 分钟执行一次) ---
+                # 逻辑：判断距离上次分钟同步是否超过 180 秒（3分钟）
                 # 获取当前实时心跳时间（用于频率计算）
                 current_beat = datetime.now()
-                if (current_beat - last_min_sync).total_seconds() >= 600:
+
+                if (current_beat - last_min_sync).total_seconds() >= 180:
                     logging.info(">>> 触发分钟数据例行同步（过去2小时窗口）...")
                     
                     # 调用无参函数，内部会自动计算 [now-2h, now] 范围并批量入库
@@ -276,4 +278,5 @@ class CollectionEngine:
                     last_min_sync = current_beat
                 #==========================
                 logging.info(">>> 本轮扫描完成，5分钟后进行下一轮检测...")
-                time.sleep(300)
+                #等待10秒
+                time.sleep(10)

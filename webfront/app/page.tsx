@@ -20,22 +20,62 @@ export default function EmissionDashboard() {
    */
   
   // 汇总数据：存储今日已用量、限制量等
+  // const [summary, setSummary] = useState({
+  //   nox_used: 0,
+  //   nox_limit: 500,
+  //   percent: 0,
+  //   advice_hourly_limit: 0,
+  //   unit: "kg"
+  // })
+
+  // "nox_flowed": 50.97,
+  // "so2_flowed": 112.23,
+  // "dust_flowed": 52.78,
+  // "nox_flow_limit": 478,
+  // "so2_flow_limit": 230,
+  // "dust_flow_limit": 70,
+  // "nox_percent": 10.66,
+  // "so2_percent": 48.79,
+  // "dust_percent": 75.4,
+  // "advice_nox_hourly_limit": 28.47,
+  // "advice_so2_hourly_limit": 7.85,
+  // "advice_dust_hourly_limit": 1.15,
+  // "unit": "m³",
+  // "update_time": "2026-01-15 09:54:00"
   const [summary, setSummary] = useState({
-    nox_used: 0,
-    nox_limit: 500,
-    percent: 0,
-    advice_hourly_limit: 0,
-    unit: "kg"
+    nox_flowed: 0,
+    so2_flowed: 0,
+    dust_flowed: 0,
+    nox_flow_limit: 0,
+    so2_flow_limit: 0,
+    dust_flow_limit: 0,
+    total_flow_limit: 0,
+    nox_percent: 0,
+    so2_percent: 0,
+    dust_percent: 0,
+    total_percent: 0,
+    advice_nox_hourly_limit: 0,
+    advice_so2_hourly_limit: 0,
+    advice_dust_hourly_limit: 0,
+    total_flow_advice_limit: 0,
+    unit: "kg",
+    update_time:"2026-01-15 09:54:00"
   })
+
+
+
   
-  // 实时锅炉列表状态
-  const [boilers, setBoilers] = useState([])
+  // 当天锅炉排放列表
+  const [boilersFlowed, setBoilersFlowed] = useState([])
   
   // 24小时趋势图状态
   const [trendData, setTrendData] = useState([])
   
   // 控制“修改目标”弹窗的显示状态
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+    // 锅炉实时排放列表
+  const [boilersParam,setBoilersParam] = useState([])
 
   // --- 2. 定义获取数据的函数 ---
   
@@ -48,15 +88,17 @@ export default function EmissionDashboard() {
        * 就像去餐厅点菜，同时点“汤、菜、饭”，而不是等汤上完了再点菜。
        * 这样三路数据同时获取，速度最快。
        */
-      const [resSum, resBoilers, resTrend] = await Promise.all([
+      const [resSum, resBoilersFlowed, resTrend,resBoilersParam] = await Promise.all([
         axios.get("http://127.0.0.1:8000/api/v1/dashboard/summary"),
-        axios.get("http://127.0.0.1:8000/api/v1/boilers/realtime"),
-        axios.get("http://127.0.0.1:8000/api/v1/analytics/trend?hours=24")
+        axios.get("http://127.0.0.1:8000/api/v1/boilers/singleflowed"),
+        axios.get("http://127.0.0.1:8000/api/v1/analytics/trend?hours=24"),
+        axios.get("http://127.0.0.1:8000/api/v1/boilers/realtime")
       ])
       // 数据回来后，分发给各自的状态变量
       setSummary(resSum.data)
-      setBoilers(resBoilers.data)
+      setBoilersFlowed(resBoilersFlowed.data)
       setTrendData(resTrend.data.data) // 对应后端接口返回的 { data: [...] }
+      setBoilersParam(resBoilersParam.data)
     } catch (error) {
       console.error("数据拉取失败:", error)
     }
@@ -95,7 +137,9 @@ export default function EmissionDashboard() {
   return (
     <div className="min-h-screen bg-background p-4 lg:p-6">
       {/* 顶部标题栏：传入实时计算的建议小时限额 */}
-      <DashboardHeader advice={summary.advice_hourly_limit} />
+      <DashboardHeader  nox_advice={summary.advice_nox_hourly_limit} 
+                        so2_advice={summary.advice_so2_hourly_limit} 
+                        dust_advice={summary.advice_dust_hourly_limit}/>
 
       <div className="mt-6 flex flex-col lg:flex-row gap-6">
         {/* 左侧区域（宽 62%）：核心统计数据 */}
@@ -105,38 +149,114 @@ export default function EmissionDashboard() {
           {/* 这里体现了布局逻辑：把 Gauge 和 Bar 组合在一个 section 里 */}
           <section className="bg-card rounded-lg border border-border p-5 shadow-sm">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-5">
-              Today&apos;s Emission &amp; Quota Overview
+              {/* Today&apos;s Emission &amp; Quota Overview */}
+              当日排放与配额概览
             </h2>
             <EmissionGauges 
-              percent={summary.percent} 
-              used={summary.nox_used} 
-              limit={summary.nox_limit} 
+              nox_percent={summary.nox_percent} 
+              nox_flowed={summary.nox_flowed} 
+              nox_flow_limit={summary.nox_flow_limit} 
+              so2_percent={summary.so2_percent} 
+              so2_flowed={summary.so2_flowed} 
+              so2_flow_limit={summary.so2_flow_limit} 
+              dust_percent={summary.dust_percent} 
+              dust_flowed={summary.dust_flowed} 
+              dust_flow_limit={summary.dust_flow_limit} 
             />
-            <TotalQuotaBar percent={summary.percent} limit={summary.nox_limit} />
+            <TotalQuotaBar percent={summary.total_percent} limit={summary.total_flow_limit} />
           </section>
 
           {/* 机组排放贡献度对比（柱状图列表） */}
           <section className="bg-card rounded-lg border border-border p-5 shadow-sm">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-5">
-              Boiler Contribution Summary
+              各锅炉排放占比
             </h2>
-            <EmissionRemovalSummary boilers={boilers} />
+            <EmissionRemovalSummary boilers={boilersFlowed} />
           </section>
 
-          {/* 底部：24小时全厂排放趋势图 */}
+          {/* 底部：24小时全厂排放趋势图
           <section className="bg-card rounded-lg border border-border p-5 shadow-sm flex-1 min-h-[300px]">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-5">
               Last 24 Hours Emission Trend
             </h2>
             <TrendChart data={trendData} />
-          </section>
+          </section> */}
         </div>
-        {/* 右侧区域（宽 38%）：实时报警面板 */}
-        {/* 右侧：实时监控报警卡片面板 */}
-        <aside className="lg:w-[38%]">
-          <AlarmPanel boilers={boilers} />
+        {/* 右侧：Alarm Panel + Limit Config (占 38%) */}
+        <aside className="lg:w-[38%] flex flex-col gap-6">
+          <div className="flex-1">
+            <AlarmPanel boilers={boilersParam} />
+          </div>
+
+          <section className="bg-card rounded-lg border border-border p-4 shadow-sm">
+        {/* 1. 头部：缩小间距 mb-3 */}
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <span className="w-1 h-3 bg-primary rounded-full" />
+            限值配置汇总
+          </h2>
+          <button 
+            onClick={() => setIsDialogOpen(true)}
+            className="text-[11px] text-primary hover:underline font-bold bg-primary/5 px-2 py-1 rounded"
+          >
+            编辑参数
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {/* 2. 第一行：总量指标 (4列) */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "NOx总量", value: 500, unit: "kg", color: "text-orange-600" },
+              { label: "SO2总量", value: 300, unit: "kg", color: "text-blue-600" },
+              { label: "烟尘总量", value: 50, unit: "kg", color: "text-emerald-600" },
+              { label: "合计总量", value: 1000, unit: "kg", color: "text-slate-600" },
+            ].map((item) => (
+              <div key={item.label} className="bg-muted/40 p-2 rounded-md border border-border/40 flex flex-col items-center">
+                {/* 调大汉字字号 text-[11px]，去掉 tracking-wider */}
+                <span className="text-[11px] font-bold text-muted-foreground mb-0.5">{item.label}</span>
+                <div className="flex items-baseline gap-0.5">
+                  {/* 稍微缩小数字 text-lg，使用 font-black 保持醒目 */}
+                  <span className={`font-mono font-black text-lg ${item.color}`}>{item.value}</span>
+                  <span className="text-[9px] text-muted-foreground/60">{item.unit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 3. 第二行：折算/浓度指标 (3列) - 使用微调的背景色 */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "NOx折算限值", value: 50, unit: "mg", color: "text-orange-500" },
+              { label: "SO2折算限值", value: 35, unit: "mg", color: "text-blue-500" },
+              { label: "粉尘折算限值", value: 10, unit: "mg", color: "text-emerald-500" },
+            ].map((item) => (
+              <div key={item.label} className="bg-primary/5 p-2 rounded-md border border-primary/10 flex flex-col items-center">
+                {/* 汉字与数字比例更和谐 */}
+                <span className="text-[11px] font-bold text-muted-foreground mb-0.5">{item.label}</span>
+                <div className="flex items-baseline gap-1">
+                  <span className={`font-mono font-black text-xl ${item.color}`}>{item.value}</span>
+                  <span className="text-[9px] text-muted-foreground/60 font-mono">{item.unit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
         </aside>
       </div>
+
+      {/* 第二层：趋势图 (独立行，自动占据全宽) */}
+      <section className="bg-card rounded-lg border border-border p-5 shadow-sm min-h-[300px]">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-5">
+          24小时全厂排放趋势分析 (Last 24 Hours Trend)
+        </h2>
+        <TrendChart data={trendData} />
+      </section>
+
+
+
+
       {/* 隐形组件：对话框（只有 isDialogOpen 为真才显示） */}
       {/* 控制弹窗：修改日总量目标 */}
       <TargetDialog 

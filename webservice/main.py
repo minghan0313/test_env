@@ -43,34 +43,74 @@ async def get_summary():
     需求 2, 4, 9: 获取今日统计、动态限值以及小时配额建议
     """
     # 1. 从数据库读取动态限值 (默认值设为 500.0)
-    daily_limit = db.get_limit("nox_limit_daily", 500.0)
+    allparams_limit = db.get_limit()
+    #将读取到的限值分配给各变量保存
+    so2_rate_high_limit=allparams_limit.get("so2_rate_high",0.0)
+    so2_rate_low_limit=allparams_limit.get("so2_rate_low",0.0)
+    so2_flow_limit=allparams_limit.get("so2_flow",0.0)
+
+    nox_rate_high_limit=allparams_limit.get("nox_rate_high",0.0)
+    nox_rate_low_limit=allparams_limit.get("nox_rate_low",0.0)
+    nox_flow_limit=allparams_limit.get("nox_flow",0.0)
     
-    # 2. 调用 SQLManager 获取今日已排放汇总 (status='-')
-    stats = db.get_today_stats()
-    used_nox = stats.get("total_nox", 0.0)
+    dust_rate_high_limit=allparams_limit.get("dust_rate_high",0.0)
+    dust_rate_low_limit=allparams_limit.get("dust_rate_low",0.0)
+    dust_flow_limit=allparams_limit.get("dust_flow",0.0)
     
-    # 3. 需求 9: 计算小时配额建议
+    total_flow_limit = allparams_limit.get("total_flow",0)
+
+    #获取3个参数分别的排放总量，
+    allparams_flowed = db.get_today_flowed()
+    nox_flowed = allparams_flowed.get("total_nox", 0.0)
+    so2_flowed = allparams_flowed.get("total_so2", 0.0)
+    dust_flowed = allparams_flowed.get("total_dust", 0.0)
+    
+    # 计算小时配额建议
     now = datetime.now()
     remaining_hours = 24 - now.hour
     if remaining_hours <= 0: remaining_hours = 1
     
-    advice = (daily_limit - used_nox) / remaining_hours
-    
+    nox_flow_advice = (nox_flow_limit - nox_flowed) / remaining_hours
+    so2_flow_advice = (so2_flow_limit - so2_flowed) / remaining_hours
+    dust_flow_advice = (dust_flow_limit - dust_flowed) / remaining_hours
+    #计算总排放量建议
+    total_flow_advice = (total_flow_limit-nox_flowed-so2_flowed-dust_flowed) / remaining_hours
     return {
-        "nox_used": round(used_nox, 2),
-        "nox_limit": daily_limit,
-        "percent": round((used_nox / daily_limit) * 100, 2) if daily_limit > 0 else 0,
-        "advice_hourly_limit": round(max(0, advice), 2),
-        "unit": "kg",
+        "nox_flowed": round(nox_flowed, 2),
+        "so2_flowed": round(so2_flowed, 2),
+        "dust_flowed": round(dust_flowed, 2),
+        "nox_flow_limit":nox_flow_limit,
+        "so2_flow_limit":so2_flow_limit,
+        "dust_flow_limit":dust_flow_limit,
+        "total_flow_limit":total_flow_limit,
+        "nox_percent": round((nox_flowed / nox_flow_limit) * 100, 2) if nox_flow_limit > 0 else 0,
+        "so2_percent": round((so2_flowed / so2_flow_limit) * 100, 2) if so2_flowed > 0 else 0,
+        "dust_percent": round((dust_flowed / dust_flow_limit) * 100, 2) if dust_flowed > 0 else 0,
+        "total_percent": round(((nox_flowed+so2_flowed+dust_flowed) / total_flow_limit) * 100, 2) if dust_flowed > 0 else 0,
+        "advice_nox_hourly_limit": round(max(0, nox_flow_advice), 2),
+        "advice_so2_hourly_limit": round(max(0, so2_flow_advice), 2),
+        "advice_dust_hourly_limit": round(max(0, dust_flow_advice), 2),
+        "total_flow_advice_limit": round(max(0, total_flow_advice), 2),
+        "unit": "m³",
         "update_time": now.strftime("%Y-%m-%d %H:%M:%S")
     }
 
 @app.get("/api/v1/boilers/realtime")
 async def get_realtime():
     """
-    需求 10: 获取全厂所有锅炉的最新的分钟折算数据快照 (用于大屏卡片)
+    获取全厂所有锅炉的最新的分钟以及以5分钟为步长的前6个折算数据快照
     """
+    #感觉这个需求有问题，应该是获取每个设备当天已经排放的nox、so2和dust的总值，然后和当前已经排放的各项总量的占比
     return db.get_all_boilers_realtime()
+
+@app.get("/api/v1/boilers/singleflowed")
+async def get_single_flowed():
+    """
+    获取每台锅炉的当天排放各项数值的总量
+    """
+    #感觉这个需求有问题，应该是获取每个设备当天已经排放的nox、so2和dust的总值，然后和当前已经排放的各项总量的占比
+    return db.get_today_single_flowed()
+
 
 @app.get("/api/v1/analytics/trend")
 async def get_trend(hours: int = Query(24, ge=1, le=72)):

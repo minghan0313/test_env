@@ -11,10 +11,9 @@
 // 目的：为了安全。防止你访问一个不存在的属性，或者把数字当成字符串传。
 interface BoilerData {
   boiler_name: string
-  nox_pf: number
-  so2_pf: number
-  dust_pf: number
-  status: string
+  total_nox: number
+  total_so2: number
+  total_dust: number
 }
 
 interface EmissionRemovalSummaryProps {
@@ -91,11 +90,24 @@ function PollutantSection({ label, unit, total, color, bgColor, data }: Pollutan
 // 主组件：EmissionRemovalSummary (组装车间)
 // export 唯一对外接口
 export function EmissionRemovalSummary({ boilers = [] }: EmissionRemovalSummaryProps) {
+
+  // 【关键修复】：将对象转为 [锅炉名, 数据] 组成的数组
+  // 如果 boilers 已经是数组，则直接使用；如果是对象，则转换
+  // 如果是数组而不是map的话，后面的reduce方法会报错
+  const boilerArray = Array.isArray(boilers) 
+    ? boilers 
+    : Object.entries(boilers).map(([name, data]: [string, any]) => ({
+        boiler_name: name,
+        total_nox: data.nox,
+        total_so2: data.so2,
+        total_dust: data.dust
+      }));
+
   // 2. 聚合计算：一次性计算出三种污染物的全厂总和
   const totals = {
-    nox: boilers.reduce((sum, b) => sum + (b.nox_pf || 0), 0),
-    so2: boilers.reduce((sum, b) => sum + (b.so2_pf || 0), 0),
-    dust: boilers.reduce((sum, b) => sum + (b.dust_pf || 0), 0),
+    nox: boilerArray.reduce((sum, b) => sum + (b.total_nox || 0), 0),
+    so2: boilerArray.reduce((sum, b) => sum + (b.total_so2 || 0), 0),
+    dust: boilerArray.reduce((sum, b) => sum + (b.total_dust || 0), 0),
   }
 
   /**
@@ -104,8 +116,8 @@ export function EmissionRemovalSummary({ boilers = [] }: EmissionRemovalSummaryP
    * 从复杂的锅炉对象数组中，精准提取出某一种污染物的数据，并转换成子组件需要的格式。
    * b[type]：这是 JS 的“方括号取值法”，通过变量名来访问对象的属性。
    */
-  const getPollutantData = (type: 'nox_pf' | 'so2_pf' | 'dust_pf') => 
-    boilers.map(b => ({ id: b.boiler_name, value: b[type] || 0 }))
+  const getPollutantData = (type: 'total_nox' | 'total_so2' | 'total_dust') => 
+  boilerArray.map(b => ({ id: b.boiler_name, value: b[type] || 0 }))
 
   return (
     // lg:flex-row 表示在大屏幕下横向排列（NOx, SO2, Dust 并排）
@@ -116,29 +128,29 @@ export function EmissionRemovalSummary({ boilers = [] }: EmissionRemovalSummaryP
       <PollutantSection props={{ label: "NOx", total: 100 }} />
       现在的 JSX 声明式写法 让我们直接在标签上写属性，React 帮我们做“打包”工作；而函数定义处的 {} 帮我们做“拆包”工作。 */}
       <PollutantSection
-        label="NOx Total"
-        unit="kg"
+        label="氮氧化物"
+        unit="m³"
         total={totals.nox}
         color="bg-blue-500"
         bgColor="bg-blue-500/15"
-        data={getPollutantData('nox_pf')}
+        data={getPollutantData('total_nox')}
       />
       {/* SO2 和 Dust 的结构完全一样，实现了高度复用 */}
       <PollutantSection
-        label="SO₂ Total"
-        unit="kg"
+        label="二氧化硫"
+        unit="m³"
         total={totals.so2}
         color="bg-yellow-500"
         bgColor="bg-yellow-500/15"
-        data={getPollutantData('so2_pf')}
+        data={getPollutantData('total_so2')}
       />
       <PollutantSection
-        label="Dust Total"
-        unit="kg"
+        label="烟尘"
+        unit="m³"
         total={totals.dust}
         color="bg-orange-500"
         bgColor="bg-orange-500/15"
-        data={getPollutantData('dust_pf')}
+        data={getPollutantData('total_dust')}
       />
     </div>
   )

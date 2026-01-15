@@ -9,15 +9,27 @@ import { CircularGauge } from "./circular-gauge"    //引入“原子组件”�
  * 这里的 percent, used, limit 都是从后端的 dashboard/summary 接口拿到的。
  */
 interface EmissionGaugesProps {
-  percent?: number;
-  used?: number;
-  limit?: number;
+  nox_percent?: number;
+  nox_flowed?: number;
+  nox_flow_limit?: number;
+  so2_percent?: number;
+  so2_flowed?: number;
+  so2_flow_limit?: number;
+  dust_percent?: number;
+  dust_flowed?: number;
+  dust_flow_limit?: number;
 }
 
 export function EmissionGauges({ 
-  percent = 0, 
-  used = 0, 
-  limit = 500 
+  nox_percent = 0,
+  nox_flowed = 0,
+  nox_flow_limit = 0,
+  so2_percent = 0,
+  so2_flowed = 0,
+  so2_flow_limit = 0,
+  dust_percent = 0,
+  dust_flowed = 0,
+  dust_flow_limit = 0,
 }: EmissionGaugesProps) {
   
   // 2. 构造显示数据。目前核心展示 NOx，SO2 和 Dust 可以暂时保留占位或根据需要关闭
@@ -29,31 +41,34 @@ export function EmissionGauges({
   const emissionData = [
     {
       id: "nox",
-      label: "NOx",
-      value: percent,        // 使用实时的百分比
-      emission: used,       // 使用实时的已排放量
-      unit: "kg",           // 统一单位为 kg
+      label: "氮氧化物",
+      value: Math.min(nox_percent, 100), // 进行数据封顶,最多100        /
+      emission: nox_flowed,       // 使用实时的已排放量
+      unit: "m³",           // 统一单位为 kg
       /**
        * 【JS 语法：三元运算符】 (条件 ? 结果A : 结果B)
        * 逻辑：如果百分比大于 90，颜色变量变成红色(#ef4444)，否则是蓝色(#3b82f6)。
        */
-      color: percent > 90 ? "#ef4444" : "#3b82f6", // 超过90%变红
+      color: nox_percent > 90 ? "#ef4444" : "#3b82f6", // 超过90%变红
+      limit: nox_flow_limit
     },
     {
       id: "so2",
-      label: "SO₂",
-      value: 0,              // // 暂时写死，以后对接了 SO2 接口直接换掉这个 0 即可
-      emission: 0,
-      unit: "kg",
-      color: "#f5b942",
+      label: "二氧化硫",
+      value: Math.min(so2_percent, 100),              // // 暂时写死，以后对接了 SO2 接口直接换掉这个 0 即可
+      emission: so2_flowed,
+      unit: "m³",
+      color: nox_percent > 90 ? "#ef4444" : "#3b82f6", // 超过90%变红
+      limit: so2_flow_limit
     },
     {
       id: "dust",
-      label: "Dust",
-      value: 0,
-      emission: 0,
-      unit: "kg",
-      color: "#f59342",
+      label: "烟尘",
+      value: Math.min(dust_percent, 100),
+      emission: dust_flowed,
+      unit: "m³",
+      color: dust_percent > 90 ? "#ef4444" : "#3b82f6", // 超过90%变红
+      limit: dust_flow_limit
     },
   ]
 
@@ -76,6 +91,7 @@ export function EmissionGauges({
           emission={item.emission}
           unit={item.unit}
           color={item.color}
+          limit={item.limit}
         />
       ))}
     </div>

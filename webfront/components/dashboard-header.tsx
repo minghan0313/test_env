@@ -9,14 +9,16 @@ import { Activity } from "lucide-react" // 【库引入】：引入一个心电�
  * 规定了父组件（page.tsx）给这个组件传数据时，必须遵守的格式。
  */
 interface DashboardHeaderProps {
-  advice?: number   // 表示 advice 这个参数是可选的（?），且必须是数字类型（number）。
+  nox_advice?: number   // 表示 advice 这个参数是可选的（?），且必须是数字类型（number）。
+  so2_advice?: number   // 表示 advice 这个参数是可选的（?），且必须是数字类型（number）。
+  dust_advice?: number   // 表示 advice 这个参数是可选的（?），且必须是数字类型（number）。
 }
 
 /**
  * 【TS 语法：解构赋值与默认值】
  * { advice = 0 }: 表示从传入的参数中提取 advice，如果父组件没传，它就默认是 0。
  */
-export function DashboardHeader({ advice = 0 }: DashboardHeaderProps) {
+export function DashboardHeader({ nox_advice = 0, so2_advice = 0,dust_advice = 0}: DashboardHeaderProps) {
   /**
    * 【React 语法：useState 状态】
    * 语法：const [变量名, 设置变量的函数] = useState<类型>(初始值)
@@ -75,44 +77,56 @@ export function DashboardHeader({ advice = 0 }: DashboardHeaderProps) {
           <Activity className="w-5 h-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Emission Monitoring System</h1>
-          <p className="text-sm text-muted-foreground">Real-time industrial environmental data</p>
+          <h1 className="text-xl font-semibold text-foreground">热电公司环保排放监控系统</h1>
+          <p className="text-sm text-muted-foreground">工业排放实时数据</p>
         </div>
       </div>
       
       {/* 右侧区域：建议指标 和 系统状态 */}
-      <div className="flex items-center gap-6">
-        {/* 调度建议：只在宽屏幕(lg)显示，避免手机端拥挤 */}
-        <div className="hidden lg:flex flex-col items-end">
-          <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">
-            Recommended Hourly Limit
-          </span>
+
+
+      {/* 推荐限值容器 */}
+      <div className="flex items-center gap-8 border-l-2 pl-8 ml-6 border-border/50">
+        {/* 参数 1: NOx */}
+        <div className="flex flex-col items-center">
+          <span className="text-[12px] font-bold text-muted-foreground leading-none mb-2">氮氧化物控制量建议</span>
           <div className="flex items-baseline gap-1">
-            <span className="text-xl font-mono font-bold text-orange-600">
-              {/* .toFixed(2) 确保数字始终显示两位小数，如 10.00 */}
-              {advice.toFixed(2)}
+            <span className="text-3xl font-mono font-black text-emerald-600 tracking-tighter">
+              {nox_advice.toFixed(2)}
             </span>
-            <span className="text-xs text-muted-foreground">kg/h</span>
+            <span className="text-[12px] font-bold text-muted-foreground">m³/h</span>
           </div>
         </div>
 
-        {/* 系统在线状态 和 实时时钟 */}
-        <div className="hidden sm:flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {/* animate-pulse 是 Tailwind 提供的动画，让绿点产生呼吸灯效果，表示“系统活着” */}
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-muted-foreground">System Online</span>
+        {/* 分隔线：加高加宽一点 */}
+        <div className="h-10 w-[2px] bg-border/60" />
+
+        {/* 参数 2: SO2 */}
+        <div className="flex flex-col items-center">
+          <span className="text-[12px] font-bold text-muted-foreground leading-none mb-2">二氧化硫控制量建议</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-mono font-black text-emerald-600 tracking-tighter">
+              {so2_advice.toFixed(2)}
+            </span>
+            <span className="text-[12px] font-bold text-muted-foreground">m³/h</span>
           </div>
-          
-          {/* 关键点：{currentTime || "--:--:--"} 
-            这叫短路表达式。如果 currentTime 还没获取到（比如加载第0.1秒），就显示横杠。
-            这解决了之前你遇到的“水合报错”问题。
-          */}
-          <time className="font-mono text-sm text-muted-foreground min-w-[80px] text-right">
-            {currentTime || "--:--:--"}
-          </time>
+        </div>
+
+        {/* 分隔线 */}
+        <div className="h-10 w-[2px] bg-border/60" />
+
+        {/* 参数 3: Dust */}
+        <div className="flex flex-col items-center">
+          <span className="text-[12px] font-bold text-muted-foreground leading-none mb-2">烟尘控制量建议</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-mono font-black text-emerald-600 tracking-tighter">
+              {dust_advice.toFixed(2)}
+            </span>
+            <span className="text-[12px] font-bold text-muted-foreground">m³/h</span>
+          </div>
         </div>
       </div>
+
     </header>
   )
 }

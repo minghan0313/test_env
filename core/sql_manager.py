@@ -66,10 +66,10 @@ class SQLManager:
         """
 
         if data_type == settings.DATA_TYPES["HOUR"] :
-            print("写入小时表")
+            #print("写入小时表")
             return self._save_entry_hour(boiler_name, entry)
         else:
-            print("写入分钟表")
+            #print("写入分钟表")
             return self._save_entry_minute(boiler_name, entry)
     
     def _save_entry_hour(self, boiler_name, entry):
@@ -225,18 +225,33 @@ class SQLManager:
             logging.error(f"保存配置[{key}]失败: {e}")
             return False
     #读取数据表
-    def get_limit(self, key, default):
+    def get_limit(self):
+        """
+        查询 sys_limit 表中所有的参数配置，并以字典形式返回
+        返回示例: {"nox_limit_daily": 500, "so2_limit_hourly": 35, ...}
+        """
         try:
             with sqlite3.connect(self.db_path) as conn:
+                # 设置 row_factory 可以让你通过列名访问数据，虽然这里我们手动转字典更直接
                 cursor = conn.cursor()
-                cursor.execute("SELECT param_value FROM sys_limit WHERE param_name = ?", (key,))
-                res = cursor.fetchone()
-                return res[0] if res else default
+                
+                # 查询所有的名称和对应的值
+                query = "SELECT param_name, param_value FROM sys_limit"
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                # 使用字典推导式将结果集转换为字典
+                # row[0] 是 param_name, row[1] 是 param_value
+                config_dict = {row[0]: row[1] for row in rows}
+                
+                logging.info(f"成功加载系统配置项，共 {len(config_dict)} 条")
+                return config_dict
+                
         except Exception as e:
-            logging.error(f"读取配置[{key}]异常: {e}")
-            return default
+            logging.error(f"批量读取系统配置异常: {e}")
+            return {} # 发生异常返回空字典，防止后续逻辑崩溃
 
-    def get_today_stats(self):
+    def get_today_flowed(self):
         """核心需求：获取今日全厂运行中(status='-')的总排量汇总"""
         today_start = datetime.now().strftime('%Y-%m-%d 00:00:00')
         try:
@@ -300,22 +315,104 @@ class SQLManager:
             return []
 
     def get_all_boilers_realtime(self):
-        """新增：一次性获取所有锅炉的最新分钟折算值（用于超标报警监视）"""
+        """
+        获取所有锅炉的实时数据。
+        逻辑：如果设备状态为'停运'，则强制将实时值和历史趋势值设为 0。
+        """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                # 复杂的子查询：获取每台锅炉在分钟表里的最后一条记录
+                
+                # SQL 保持不变（获取 7 个采样点）
                 sql = """
-                    SELECT a.* FROM boiler_data_minute a
-                    INNER JOIN (
-                        SELECT boiler_name, MAX(time) as max_time
+                    SELECT boiler_name, time, nox_zs, so2_zs, dust_zs, status
+                    FROM (
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY boiler_name ORDER BY time DESC) as rn
                         FROM boiler_data_minute
-                        GROUP BY boiler_name
-                    ) b ON a.boiler_name = b.boiler_name AND a.time = b.max_time
+                    )
+                    WHERE (rn - 1) % 5 = 0 AND rn <= 31
+                    ORDER BY boiler_name, time ASC;
                 """
                 cursor.execute(sql)
-                return [dict(row) for row in cursor.fetchall()]
+                rows = cursor.fetchall()
+
+                formatted_results = {}
+                for row in rows:
+                    name = row["boiler_name"]
+                    status = row["status"]
+                    # --- 核心判断逻辑 ---
+                    is_off = (status == "停运")
+                    
+                    # 初始化结构
+                    if name not in formatted_results:
+                        formatted_results[name] = {
+                            "boiler_name": name,
+                            "nox_zs": 0.0, "so2_zs": 0.0, "dust_zs": 0.0,
+                            "status": "-", "update_time": "",
+                            "history": {"nox": [], "so2": [], "dust": [], "times": []}
+                        }
+                    
+                    # 1. 填充历史数组：如果停运则存入 0，否则存入实际值
+                    h_nox = 0.0 if is_off else round(row["nox_zs"] or 0, 2)
+                    h_so2 = 0.0 if is_off else round(row["so2_zs"] or 0, 2)
+                    h_dust = 0.0 if is_off else round(row["dust_zs"] or 0, 2)
+                    
+                    formatted_results[name]["history"]["nox"].append(h_nox)
+                    formatted_results[name]["history"]["so2"].append(h_so2)
+                    formatted_results[name]["history"]["dust"].append(h_dust)
+                    formatted_results[name]["history"]["times"].append(row["time"][-8:-3]) 
+                    
+                    # 2. 更新实时值：同样根据状态判定
+                    formatted_results[name]["nox_zs"] = h_nox
+                    formatted_results[name]["so2_zs"] = h_so2
+                    formatted_results[name]["dust_zs"] = h_dust
+                    formatted_results[name]["status"] = status
+                    formatted_results[name]["update_time"] = row["time"]
+
+                return formatted_results
         except Exception as e:
             logging.error(f"获取实时状态列表失败: {e}")
-            return []
+            return {}
+    #提供每台锅炉当天已经排放的各项数值的总量 
+    def get_today_single_flowed(self):
+        """
+        核心需求：获取今日各台设备（单炉）的排放总量汇总
+        返回格式: { "NORTH_1": {"nox": 0.0, "so2": 0.0, "dust": 0.0}, ... }
+        """
+        today_start = datetime.now().strftime('%Y-%m-%d 00:00:00')
+        # 初始化结果集，确保即使数据库没数据，7台设备也都有默认值 0.0
+        results = {name: {"nox": 0.0, "so2": 0.0, "dust": 0.0} for name in settings.DEVICES.keys()}
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row 
+                cursor = conn.cursor()
+                
+                # 使用 GROUP BY boiler_name 进行分组统计
+                sql = """
+                    SELECT 
+                        boiler_name,
+                        SUM(nox_pf) as total_nox, 
+                        SUM(so2_pf) as total_so2, 
+                        SUM(dust_pf) as total_dust 
+                    FROM boiler_data_hour 
+                    WHERE time >= ? AND status = '-'
+                    GROUP BY boiler_name
+                """
+                cursor.execute(sql, (today_start,))
+                rows = cursor.fetchall()
+                
+                for row in rows:
+                    b_name = row["boiler_name"]
+                    # 只有当该设备在我们的配置列表中时才记录
+                    if b_name in results:
+                        results[b_name] = {
+                            "nox": row["total_nox"] if row["total_nox"] else 0.0,
+                            "so2": row["total_so2"] if row["total_so2"] else 0.0,
+                            "dust": row["total_dust"] if row["total_dust"] else 0.0
+                        }
+                return results
+
+        except Exception as e:
+            logging.error(f"获取今日单炉统计失败: {e}")
+            return results
