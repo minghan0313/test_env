@@ -210,7 +210,7 @@ export default function EmissionDashboard() {
         {/* 右侧：Alarm Panel 机组实时折算监控+ Limit Config (占 38%) */}
         <aside className="lg:w-[38%] flex flex-col gap-6">
           <div className="flex-1">
-            <AlarmPanel boilers={boilersParam} />
+            <AlarmPanel boilers={boilersParam} onDetailClick={handleFetchDetail} />
           </div>
 
           <section className="bg-card rounded-lg border border-border p-4 shadow-sm">
