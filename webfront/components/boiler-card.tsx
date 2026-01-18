@@ -30,6 +30,8 @@ interface BoilerCardProps {
   so2Status: PollutantStatus
   dustStatus: PollutantStatus
   trendData: TrendData
+  // --- 新增这一行，告诉 TS 允许接收这个点击回调函数 ---
+  onTrendClick?: (type: "NOx" | "SO2" | "Dust") => void;
 }
 
 /**
@@ -96,7 +98,7 @@ function PollutantRow({ label, pollutantKey, value, status, trendData, onTrendCl
   )
 }
 
-export function BoilerCard({ id, nox, so2, dust, noxStatus, so2Status, dustStatus, trendData }: BoilerCardProps) {
+export function BoilerCard({ id, nox, so2, dust, noxStatus, so2Status, dustStatus, trendData, onTrendClick }: BoilerCardProps) {
   /**
    * 【React Hook：useState】
    * 即使数据是从外部传进来的，组件内部也可以有自己的“小秘密”
@@ -108,8 +110,14 @@ export function BoilerCard({ id, nox, so2, dust, noxStatus, so2Status, dustStatu
 
   // 点击趋势图的动作：记录选了谁，然后打开弹窗
   const handleTrendClick = (pollutant: "NOx" | "SO2" | "Dust") => {
-    setSelectedPollutant(pollutant)
-    setModalOpen(true)
+    // setSelectedPollutant(pollutant)
+    // setModalOpen(true)
+    setSelectedPollutant(pollutant);
+  // setModalOpen(true); // 如果你打算完全复用 TargetDialog，这一行可以注释掉
+  // 【关键】：在这里通知父组件，加载 8 小时历史详情
+    if (onTrendClick) {
+      onTrendClick(pollutant);
+    }
   }
   // 根据选中的标签，从大包裹里挑出对应的那条趋势线
   const getSelectedTrendData = () => {
@@ -194,13 +202,13 @@ export function BoilerCard({ id, nox, so2, dust, noxStatus, so2Status, dustStatu
       {/* 趋势详情弹出层：
         这是一个“传送门”组件，它不在卡片内部显示，而是点击后盖在整个屏幕上
       */}
-      <TrendDetailModal
+      {/* <TrendDetailModal
         open={modalOpen}
         onOpenChange={setModalOpen}
         deviceId={id}
         pollutant={selectedPollutant}
         data={getSelectedTrendData()}
-      />
+      /> */}
     </>
   )
 }

@@ -74,8 +74,33 @@ export default function EmissionDashboard() {
   // 控制“修改目标”弹窗的显示状态
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
+  // 新增：当前选中的机组 ID 和参数类型
+  const [selectedBoiler, setSelectedBoiler] = useState("NORTH_1")
+  const [selectedParam, setSelectedParam] = useState<"nox" | "so2" | "dust">("nox")
+
     // 锅炉实时排放列表
   const [boilersParam,setBoilersParam] = useState([])
+
+
+  // page.tsx 内部逻辑
+  const [detailHistory, setDetailHistory] = useState([]); // 存储 8 小时详情
+
+  const handleFetchDetail = async (boilerId: string, param: string) => {
+  // 1. 设置当前选中的目标，方便弹窗标题显示
+  setSelectedBoiler(boilerId)
+  setSelectedParam(param as "nox" | "so2" | "dust")
+
+  try {
+    // 2. 获取 8 小时历史详情
+    const res = await axios.get(`http://127.0.0.1:8000/api/v1/boilers/history-detail?boiler=${boilerId}&param=${param.toLowerCase()}`);
+    setDetailHistory(res.data);
+    
+    // 3. 数据拿到后，打开弹窗
+    setIsDialogOpen(true)
+  } catch (error) {
+    console.error("获取详情失败", error);
+  }
+  }
 
   // --- 2. 定义获取数据的函数 ---
   
@@ -182,7 +207,7 @@ export default function EmissionDashboard() {
             <TrendChart data={trendData} />
           </section> */}
         </div>
-        {/* 右侧：Alarm Panel + Limit Config (占 38%) */}
+        {/* 右侧：Alarm Panel 机组实时折算监控+ Limit Config (占 38%) */}
         <aside className="lg:w-[38%] flex flex-col gap-6">
           <div className="flex-1">
             <AlarmPanel boilers={boilersParam} />
@@ -262,9 +287,18 @@ export default function EmissionDashboard() {
       <TargetDialog 
         open={isDialogOpen} 
         onOpenChange={setIsDialogOpen} 
-        currentTarget={summary.nox_limit}
+        boilerId={selectedBoiler}       // 传入当前锅炉名
+        paramType={selectedParam}       // 传入参数类型
+        historyData={detailHistory}     // 传入刚刚获取的 24 个点
+        currentTarget={summary.nox_flow_limit} // 修正属性名：使用 nox_flow_limit
         onTargetChange={handleUpdateLimit}
       />
+      {/* <TargetDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        currentTarget={summary.nox_limit}
+        onTargetChange={handleUpdateLimit}
+      /> */}
       {/* 交互组件：悬浮按钮 */}
       {/* 右下角悬浮按钮：点击打开弹窗 */}
       <FloatingActionButton onClick={() => setIsDialogOpen(true)} />

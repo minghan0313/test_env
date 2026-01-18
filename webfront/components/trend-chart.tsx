@@ -41,8 +41,14 @@ export function TrendChart({ data = [] }: TrendChartProps) {
     if (chartData.length < 2) return ""
     const points = chartData.map((d, i) => {
       const x = (i / (chartData.length - 1)) * chartWidth
-      const y = getY(d[key])
+      // 增加对通用键名 "value" 的支持（对应你 SQL 返回的格式）
+      const val = d[key] !== undefined ? d[key] : (d as any).value;
+
+      // const y = getY(d[key])
+      // return `${i === 0 ? "M" : "L"} ${x} ${y}`
+      const y = getY(val || 0)
       return `${i === 0 ? "M" : "L"} ${x} ${y}`
+      
     })
     return points.join(" ")
   }

@@ -103,6 +103,24 @@ async def get_realtime():
     #感觉这个需求有问题，应该是获取每个设备当天已经排放的nox、so2和dust的总值，然后和当前已经排放的各项总量的占比
     return db.get_all_boilers_realtime()
 
+#查询前8个小时，每小时3个数据点的历史数据
+@app.get("/api/v1/boilers/history-detail")
+async def get_boiler_history(
+    boiler: str, 
+    param: str = "nox", 
+    hours: int = 8
+):
+    """
+    前端调用示例: /api/v1/boilers/history-detail?boiler=NORTH_1&param=nox
+    """
+    # 这里的 sql_manager 是你实例化的 SQLManager 对象
+    data = db.get_boiler_history_detail(boiler, param, hours)
+    
+    if not data:
+        # 如果没查到数据，返回空列表而不是 404，防止前端报错
+        return []
+    return data
+
 @app.get("/api/v1/boilers/singleflowed")
 async def get_single_flowed():
     """

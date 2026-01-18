@@ -33,10 +33,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
-        {children}
-        <Analytics />
-      </body>
+     
+    <body className="font-sans antialiased" suppressHydrationWarning={true}>
+      {children}
+      <Analytics />
+    </body>
     </html>
   )
 }

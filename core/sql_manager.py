@@ -374,6 +374,57 @@ class SQLManager:
         except Exception as e:
             logging.error(f"获取实时状态列表失败: {e}")
             return {}
+        
+    def get_boiler_history_detail(self, boiler_name, param_type, hours=8):
+            """
+            获取指定设备历史详情。
+            业务规则：若 status 为'停运'，则该点数值强制归零。
+            采样：每 20 分钟一个点。
+            """
+            column_map = {
+                "nox": "nox_zs",
+                "so2": "so2_zs",
+                "dust": "dust_zs"
+            }
+            col = column_map.get(param_type.lower(), "nox_zs")
+            limit_rn = hours * 60
+
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    
+                    # 在 SQL 层面通过 CASE WHEN 实现状态判定
+                    sql = f"""
+                        SELECT 
+                            time, 
+                            CASE 
+                                WHEN status = '停运' THEN 0 
+                                ELSE {col} 
+                            END as value
+                        FROM (
+                            SELECT time, {col}, status,
+                                ROW_NUMBER() OVER (ORDER BY time DESC) as rn
+                            FROM boiler_data_minute
+                            WHERE boiler_name = ?
+                        )
+                        WHERE (rn - 1) % 20 = 0 AND rn <= ?
+                        ORDER BY time ASC
+                    """
+                    cursor.execute(sql, (boiler_name, limit_rn))
+                    
+                    return [
+                        {
+                            "time": row["time"], 
+                            "value": round(row["value"] or 0, 2)
+                        } 
+                        for row in cursor.fetchall()
+                    ]
+            except Exception as e:
+                logging.error(f"查询设备[{boiler_name}]历史详情失败: {e}")
+                return []
+
+
     #提供每台锅炉当天已经排放的各项数值的总量 
     def get_today_single_flowed(self):
         """
