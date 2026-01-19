@@ -18,10 +18,22 @@ export function TotalQuotaBar({
    * 相比于仪表盘的三元运算符，这里我们使用一个专门的函数来处理更复杂的逻辑。
    * 这种写法可读性更高，方便以后增加更多的颜色档位。
    */
+
+  /**
+   * 【核心逻辑：强制封顶】
+   * 定义一个内部变量 displayPercent，将其限制在 0-100 之间。
+   * 无论后端传过来的是 120 还是 -5，界面上统一只处理 0-100 的范围。
+   */
+  const displayPercent = Math.min(Math.max(percent, 0), 100);
+
+  /**
+   * 【颜色动态计算】
+   * 使用处理后的 displayPercent 来判断颜色档位，逻辑更统一。
+   */
   const getProgressColor = () => {
-    if (percent >= 90) return "linear-gradient(90deg, #ef4444, #b91c1c)";   // 红色危险
-    if (percent >= 80) return "linear-gradient(90deg, #f59e0b, #d97706)";   // 橙色预警
-    return "linear-gradient(90deg, #5c9eff, #47d4b4)";                      // 蓝绿色安全
+    if (displayPercent >= 90) return "linear-gradient(90deg, #ef4444, #b91c1c)";   // 红色危险
+    if (displayPercent >= 80) return "linear-gradient(90deg, #f59e0b, #d97706)";   // 橙色预警
+    return "linear-gradient(90deg, #5c9eff, #47d4b4)";                       // 蓝绿色安全
   };
 
   return (
@@ -47,23 +59,22 @@ export function TotalQuotaBar({
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000"
           style={{
-            // 1. 物理长度绑定：将 percent 数字后面拼上 "%"
-            // Math.min(percent, 100) 是为了防止数据异常导致进度条“飞出”外壳
-            // 确保进度条视觉上最高只到 100%，但在下方的数字里依然会诚实地显示 120%。这就是防御性编程——即便数据异常，界面也不能崩。
-            width: `${Math.min(percent, 100)}%`, // 确保进度条最长100%
-            // 2. 颜色绑定：调用上面的函数获取渐变色字符串
+            // 使用封顶后的百分比设置宽度
+            width: `${displayPercent}%`, 
             background: getProgressColor(),
-            // 3. 动态阴影：如果是红色（超标），增加红色发光效果，增强视觉冲击
-            boxShadow: percent >= 90 ? "0 0 12px #ef444450" : "0 0 12px #5c9eff50",
+            // 阴影效果也根据 displayPercent 判断
+            boxShadow: displayPercent >= 90 ? "0 0 12px #ef444450" : "0 0 12px #5c9eff50",
           }}
         />
       </div>
       {/* 底部百分比刻度 */}
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs text-muted-foreground">0%</span>
-        {/* 数字实时展示：toFixed(1) 保留一位小数 */}
-        <span className={`text-lg font-bold ${percent >= 90 ? 'text-red-500' : 'text-foreground'}`}>
-          {percent.toFixed(1)}%
+        {/** * 【核心修复】：数字显示也改用 displayPercent
+         * 这样当实际数值超过 100 时，这里也会诚实地显示 100.0%
+         */}
+        <span className={`text-lg font-bold ${displayPercent >= 90 ? 'text-red-500' : 'text-foreground'}`}>
+          {displayPercent.toFixed(1)}%
         </span>
         <span className="text-xs text-muted-foreground">100%</span>
       </div>
