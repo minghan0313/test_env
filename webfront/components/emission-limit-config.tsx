@@ -28,7 +28,8 @@ export function EmissionLimitConfig({ sysLimits, onSaveSuccess }: EmissionLimitC
   const [config, setConfig] = useState<LimitConfig | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-
+  //局域网访问
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
   useEffect(() => {
     if (sysLimits) {
       setConfig(sysLimits)
@@ -51,7 +52,7 @@ export function EmissionLimitConfig({ sysLimits, onSaveSuccess }: EmissionLimitC
     try {
       // 1. 将 8 个参数转换成 8 个独立的请求任务
       const updateTasks = Object.entries(config).map(([key, value]) => {
-        return axios.post("http://127.0.0.1:8000/api/v1/config/updatelimit", {
+        return axios.post(`${API_BASE}/api/v1/config/updatelimit`, {
           key: key,
           value: value
         });

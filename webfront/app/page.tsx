@@ -44,6 +44,13 @@ export default function EmissionDashboard() {
   // "advice_dust_hourly_limit": 1.15,
   // "unit": "m³",
   // "update_time": "2026-01-15 09:54:00"
+
+
+
+  //局域网访问
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+
   const [summary, setSummary] = useState({
     nox_flowed: 0,
     so2_flowed: 0,
@@ -96,7 +103,7 @@ export default function EmissionDashboard() {
 
     try {
       // 2. 获取 8 小时历史详情
-      const res = await axios.get(`http://127.0.0.1:8000/api/v1/boilers/history-detail?boiler=${boilerId}&param=${param.toLowerCase()}`);
+      const res = await axios.get(`${API_BASE}/api/v1/boilers/history-detail?boiler=${boilerId}&param=${param.toLowerCase()}`);
       setDetailHistory(res.data);
 
       // 3. 数据拿到后，打开弹窗
@@ -118,11 +125,11 @@ export default function EmissionDashboard() {
        * 这样三路数据同时获取，速度最快。
        */
       const [resSum, resBoilersFlowed, resTrend, resBoilersParam, resSysLimits] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/v1/dashboard/summary"),
-        axios.get("http://127.0.0.1:8000/api/v1/boilers/singleflowed"),
-        axios.get("http://127.0.0.1:8000/api/v1/analytics/trend?hours=24"),
-        axios.get("http://127.0.0.1:8000/api/v1/boilers/realtime"),
-        axios.get("http://127.0.0.1:8000/api/v1/config/getlimit") // 新增：拉取8限制值
+        axios.get(`${API_BASE}/api/v1/dashboard/summary`),
+        axios.get(`${API_BASE}/api/v1/boilers/singleflowed`),
+        axios.get(`${API_BASE}/api/v1/analytics/trend?hours=24`),
+        axios.get(`${API_BASE}/api/v1/boilers/realtime`),
+        axios.get(`${API_BASE}/api/v1/config/getlimit`) // 新增：拉取8限制值
       ])
       // 数据回来后，分发给各自的状态变量
       setSummary(resSum.data)
@@ -140,7 +147,7 @@ export default function EmissionDashboard() {
   const handleUpdateLimit = async (newLimit: number) => {
     try {
       // 向后端发送 POST 请求，修改数据库
-      await axios.post("http://127.0.0.1:8000/api/v1/config/limit", {
+      await axios.post(`${API_BASE}/api/v1/config/limit`, {
         key: "nox_limit_daily",
         value: newLimit
       })
