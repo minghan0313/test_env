@@ -290,8 +290,8 @@ export default function EmissionDashboard() {
         boilerId={selectedBoiler}       // 传入当前锅炉名
         paramType={selectedParam}       // 传入参数类型
         historyData={detailHistory}     // 传入刚刚获取的 24 个点
-        currentTarget={summary.nox_flow_limit} // 修正属性名：使用 nox_flow_limit
-        onTargetChange={handleUpdateLimit}
+        // currentTarget={summary.nox_flow_limit} // 修正属性名：使用 nox_flow_limit
+        // onTargetChange={handleUpdateLimit}
       />
       {/* <TargetDialog 
         open={isDialogOpen} 
