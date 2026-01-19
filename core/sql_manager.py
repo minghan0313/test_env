@@ -467,3 +467,41 @@ class SQLManager:
         except Exception as e:
             logging.error(f"获取今日单炉统计失败: {e}")
             return results
+
+    #获得限制值
+    def get_all_limits(self):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # row_factory 使结果可以通过字典方式访问
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                query = "SELECT param_name, param_value FROM sys_limit"
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                # 将多行 KV 转为单对象
+                return {row['param_name']: row['param_value'] for row in rows}
+        except Exception as e:
+            logging.error(f"获取所有限值配置失败: {e}")
+            return {}
+    #更新限制值
+    def update_all_limits(self, config_data: dict):
+        """
+        批量更新限值。
+        接收前端传来的字典，循环更新数据库。
+        """
+        import datetime
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 使用事务（Transaction）确保数据一致性，要么全成功，要么全失败
+        try:
+            for name, value in config_data.items():
+                query = """
+                    UPDATE sys_limit 
+                    SET param_value = ?, update_time = ? 
+                    WHERE param_name = ?
+                """
+                self.db.execute(query, (value, current_time, name))
+            return True
+        except Exception as e:
+            print(f"数据库更新失败: {e}")
+            return False

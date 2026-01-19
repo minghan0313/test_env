@@ -19,6 +19,19 @@ class LimitUpdate(BaseModel):
     key: str    # 如 "nox_limit_daily" 或 "nox_zs_standard"
     value: float
 
+
+# 定义8个参排放限制值的请求体格式
+class LimitConfig(BaseModel):
+    total_flow: float
+    so2_flow: float
+    nox_flow: float
+    dust_flow: float
+    so2_rate_high: float
+    nox_rate_high: float
+    nox_rate_low: float
+    dust_rate_high: float
+
+
 app = FastAPI(title="环保排放监控系统 API", version="1.2.0")
 # 在 app = FastAPI() 之后添加
 #默认情况下，浏览器会阻止 3000 端口（前端）访问 8000 端口（后端）。
@@ -86,7 +99,9 @@ async def get_summary():
         "nox_percent": round((nox_flowed / nox_flow_limit) * 100, 2) if nox_flow_limit > 0 else 0,
         "so2_percent": round((so2_flowed / so2_flow_limit) * 100, 2) if so2_flowed > 0 else 0,
         "dust_percent": round((dust_flowed / dust_flow_limit) * 100, 2) if dust_flowed > 0 else 0,
-        "total_percent": round(((nox_flowed+so2_flowed+dust_flowed) / total_flow_limit) * 100, 2) if dust_flowed > 0 else 0,
+        #"total_percent": round(((nox_flowed+so2_flowed+dust_flowed) / total_flow_limit) * 100, 2) if dust_flowed > 0 else 0,
+        #避免分母为0的情况
+        "total_percent": round(((nox_flowed + so2_flowed + dust_flowed) / total_flow_limit) * 100, 2) if total_flow_limit > 0 else 0,
         "advice_nox_hourly_limit": round(max(0, nox_flow_advice), 2),
         "advice_so2_hourly_limit": round(max(0, so2_flow_advice), 2),
         "advice_dust_hourly_limit": round(max(0, dust_flow_advice), 2),
@@ -130,6 +145,21 @@ async def get_single_flowed():
     return db.get_today_single_flowed()
 
 
+
+@app.get("/api/v1/config/emission-limits")
+def read_limits():
+    return db.get_all_limits()
+
+@app.post("/api/v1/config/emission-limits")
+def update_limits(config: LimitConfig):
+    # 将模型转为字典传给 SQLManager
+    success = db.update_all_limits(config.dict())
+    if success:
+        return {"message": "配置更新成功"}
+    else:
+        return {"message": "更新失败"}, 500
+
+
 @app.get("/api/v1/analytics/trend")
 async def get_trend(hours: int = Query(24, ge=1, le=72)):
     """
@@ -140,7 +170,7 @@ async def get_trend(hours: int = Query(24, ge=1, le=72)):
 
 # --- 配置管理接口 ---
 
-@app.post("/api/v1/config/limit")
+@app.post("/api/v1/config/updatelimit")
 async def update_limit(data: LimitUpdate):
     """
     设置动态限值：总量目标或浓度标准
@@ -152,11 +182,10 @@ async def update_limit(data: LimitUpdate):
     else:
         return {"status": "error", "message": "保存配置失败"}
 
-@app.get("/api/v1/config/limit/{key}")
-async def fetch_limit(key: str, default: float = 0.0):
-    """读取指定的限值配置"""
-    value = db.get_limit(key, default)
-    return {"key": key, "value": value}
+@app.get("/api/v1/config/getlimit")
+async def fetch_limit():
+    """获取所有限值配置 (给垂直面板用)"""
+    return db.get_all_limits()
 
 if __name__ == "__main__":
     import uvicorn

@@ -83,6 +83,8 @@ export default function EmissionDashboard() {
   // 锅炉实时排放列表
   const [boilersParam, setBoilersParam] = useState([])
 
+  //限制值
+  const [sysLimits, setSysLimits] = useState(null);
 
   // page.tsx 内部逻辑
   const [detailHistory, setDetailHistory] = useState([]); // 存储 8 小时详情
@@ -115,17 +117,19 @@ export default function EmissionDashboard() {
        * 就像去餐厅点菜，同时点“汤、菜、饭”，而不是等汤上完了再点菜。
        * 这样三路数据同时获取，速度最快。
        */
-      const [resSum, resBoilersFlowed, resTrend, resBoilersParam] = await Promise.all([
+      const [resSum, resBoilersFlowed, resTrend, resBoilersParam, resSysLimits] = await Promise.all([
         axios.get("http://127.0.0.1:8000/api/v1/dashboard/summary"),
         axios.get("http://127.0.0.1:8000/api/v1/boilers/singleflowed"),
         axios.get("http://127.0.0.1:8000/api/v1/analytics/trend?hours=24"),
-        axios.get("http://127.0.0.1:8000/api/v1/boilers/realtime")
+        axios.get("http://127.0.0.1:8000/api/v1/boilers/realtime"),
+        axios.get("http://127.0.0.1:8000/api/v1/config/getlimit") // 新增：拉取8限制值
       ])
       // 数据回来后，分发给各自的状态变量
       setSummary(resSum.data)
       setBoilersFlowed(resBoilersFlowed.data)
       setTrendData(resTrend.data.data) // 对应后端接口返回的 { data: [...] }
       setBoilersParam(resBoilersParam.data)
+      setSysLimits(resSysLimits.data)
     } catch (error) {
       console.error("数据拉取失败:", error)
     }
@@ -223,7 +227,12 @@ export default function EmissionDashboard() {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
               排放限值设置
             </h2>
-            <EmissionLimitConfig />
+            <EmissionLimitConfig 
+              sysLimits={sysLimits} 
+              // 回调函数，设定新的限制值后，要重新计算当前的排放数据
+              onSaveSuccess={fetchData}
+            />
+
           </div>
         </div>
 
