@@ -2,28 +2,15 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { ThemeProvider } from "@/components/theme-provider" // 引入你的 Provider
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Emission Monitor",
-  description: "Environmental emission monitoring dashboard",
-  generator: "v0.app",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Emission Monitor",
-  },
-}
-
-export const viewport: Viewport = {
-  themeColor: "#1a1a1f",
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  title: "环保排放监控系统",
+  description: "热电公司环保排放实时监控平台",
 }
 
 export default function RootLayout({
@@ -32,12 +19,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-     
-    <body className="font-sans antialiased" suppressHydrationWarning={true}>
-      {children}
-      <Analytics />
-    </body>
+    // 关键点：添加 suppressHydrationWarning
+    <html lang="zh" suppressHydrationWarning>
+      <body className="font-sans antialiased">
+        {/* 关键点：配置 attribute="class" */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Analytics />
+        </ThemeProvider>
+      </body>
     </html>
   )
 }
