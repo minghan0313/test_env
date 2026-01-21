@@ -18,29 +18,56 @@ if root_path not in sys.path:
 from core import settings  # 导入模块本身
 
 class AuthManager:
+    # --- 新增内部变量：记录上次验证的时间，避免短时间内重复验证 ---
+    _last_verify_time = 0
+
     #将main中的本地从保存的Token验证逻辑放入到core中，降低main的耦合
     @classmethod
-    def get_local_token(cls):
-        #统一获取Token的入口    
-        # 1、查是否有保存的Token 2、验证是否有效 3、失败就调用UI登录重新获取并写入本地
+    def get_local_token(cls,force_refresh=False):
+        """
+        统一获取Token的入口
+        优化思路：
+        1. 只要 force_refresh 为 False，优先信任本地缓存，减少验证请求。
+        2. 如果本地没缓存，或者被外部明确告知 Token 已失效（force_refresh=True），才执行 UI 登录。
+        """
+        #查是否有保存的Token
         cached_token = TokenManager.get_token()
-        if cached_token:
-            print("正在验证本地Token有效性...")
-            try:
-                #使用配置中的设备进行验证
-                test_res = DataFetcher.fetch_online_data(cached_token,settings.DEVICES["SOUTH_2"],"2025-01-01 00:00:00","2025-01-01 00:05:00")
-                if test_res is not None:
-                    print("本地缓存有效，跳过浏览器登录")
-                    return cached_token
-            except Exception as e:
-                print("网站服务出现异常")
-        #2、缓存部存在或失效，执行UI自动化登录
+        #优化逻辑：如果外部没强制要求刷新，且我们有缓存，直接返回
+        # 理由：避免 CollectionEngine 每一轮循环的每一个设备抓取前都发一次验证请求给服务器
+        if cached_token and not force_refresh:
+            return cached_token
+        
+        # 验证是否有效 (仅在没有缓存，或外部要求强制刷新时才执行)
+        if cached_token and force_refresh:
+            print("收到强制刷新请求，正在准备重新登录...")
+
+        # 3、缓存不存在或已确认失效，执行UI自动化登录
         print("正在重新登录获取新的Token...")
-        new_token= cls.get_access_token()
+        new_token = cls.get_access_token()
+
         if new_token:
             TokenManager.save_token(new_token)
             print("新Token已经写入缓存")
             return new_token
+        
+        return None
+        # if cached_token:
+        #     print("正在验证本地Token有效性...")
+        #     try:
+        #         #使用配置中的设备进行验证
+        #         test_res = DataFetcher.fetch_online_data(cached_token,settings.DEVICES["SOUTH_2"],"2025-01-01 00:00:00","2025-01-01 00:05:00")
+        #         if test_res is not None:
+        #             print("本地缓存有效，跳过浏览器登录")
+        #             return cached_token
+        #     except Exception as e:
+        #         print("网站服务出现异常")
+        # #2、缓存部存在或失效，执行UI自动化登录
+        # print("正在重新登录获取新的Token...")
+        # new_token= cls.get_access_token()
+        # if new_token:
+        #     TokenManager.save_token(new_token)
+        #     print("新Token已经写入缓存")
+        #     return new_token
 
     @classmethod
     def get_access_token(cls):
@@ -48,7 +75,12 @@ class AuthManager:
         with sync_playwright() as p:
             # 1. 启动环境
             browser = p.chromium.launch(headless=False) 
-            context = browser.new_context(no_viewport=True)
+            #context = browser.new_context(no_viewport=True)
+            #修改，模拟真实浏览器环境，减少被识别为爬虫的概率 ---
+            context = browser.new_context(
+                no_viewport=True,
+                user_agent=settings.USER_AGENT # 使用与 DataFetcher 一致的 UA
+            )
             page = context.new_page()
             
             try:
@@ -119,14 +151,11 @@ class AuthManager:
     @staticmethod
     def _retry_get_local_storage(page, key):
         """重试机制获取LocalStorage"""
-        token_key = key
-        token_value = page.evaluate(f'localStorage.getItem("{token_key}")')
-
-        if token_value: 
-            #token_value = "bearer "+ token_value
-            return token_value
-        time.sleep(0.5)
-
+        for i in range(5): # 最多尝试 5 次
+            token_value = page.evaluate(f'localStorage.getItem("{key}")')
+            if token_value:
+                return token_value
+            time.sleep(1)
         return None
     
 

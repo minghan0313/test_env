@@ -21,8 +21,8 @@ class DataFetcher:
         headers = {
             "Authorization": f"bearer {token}",
             "Content-Type": "application/json",
-            # "Origin": "http://27.191.132.93:9191",    #POST请求的时候不需要这个header信息
-            # "Referer": "http://27.191.132.93:9191/psIndex/dataQuery?tab=dataQuery",  #POST请求的时候不需要这个header信息
+            "Origin": "http://27.191.132.93:9191",    #POST请求的时候不需要这个header信息 还是加上吧，避免风控
+            "Referer": "http://27.191.132.93:9191/psIndex/dataQuery?tab=dataQuery",  #POST请求的时候不需要这个header信息  还是加上吧，避免风控
             "User-Agent": settings.USER_AGENT # 建议放进 config
         }
         payload = {

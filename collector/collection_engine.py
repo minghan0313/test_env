@@ -1,6 +1,7 @@
 import time
 import logging
 from datetime import datetime, timedelta
+import random
 
 #引用上层目录core的代码文件
 import sys
@@ -62,6 +63,7 @@ class CollectionEngine:
         """执行单次数据抓取与入库"""
 
         """增强版：带有数据质量校验的抓取"""
+        #获取当前 Token (此时 get_local_token 默认 force_refresh=False，只读缓存)
         token = AuthManager.get_local_token()
         #小时报表的开始和结束时间设置。
         #网站中各设备的小时数据不是整点算出的，通常都比整点晚。
@@ -93,7 +95,23 @@ class CollectionEngine:
             # 暂时是抓取小时报表数据，后续要补充分钟报表的数据
             data_list = self.fetcher.fetch_online_data(
                 token, port_id, begin_time, end_time, data_type
-            )  
+            )
+
+            #【重点修改】如果抓取结果为 None (可能是 403 或 401)
+            if data_list is None:
+                logging.warning(f"[{name}] {begin_time} 抓取异常，尝试强制刷新 Token...")
+                
+                # 调用强制刷新逻辑，打开浏览器重新登录
+                new_token = AuthManager.get_local_token(force_refresh=True)
+                
+                if new_token:
+                    # 使用新 Token 重新抓取一次
+                    data_list = self.fetcher.fetch_online_data(new_token, port_id, begin_time, end_time, data_type)
+                else:
+                    logging.error("强制刷新 Token 失败，请检查账号状态。")
+                    return False
+                
+
             #如果查到的数据行数大于0
             #这个判断条件不是还好，因为网页API只要是正确的时间，哪怕没有生产数据，也会返回单列值为"-"的数据行
             if data_list and len(data_list) > 0:
@@ -279,4 +297,9 @@ class CollectionEngine:
                 #==========================
                 logging.info(">>> 本轮扫描完成，5分钟后进行下一轮检测...")
                 #等待10秒
+                #固定的10秒不是很安全，容易触发网站的保护机制
+                wait_time = random.randint(60, 300) # 随机等待 1 到 3 分钟，避免触发网站的检测
+                logging.info(f">>> 本轮扫描完成，将在 {wait_time} 秒后进行下一轮检测...")
+                time.sleep(wait_time)
+
                 time.sleep(10)
