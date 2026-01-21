@@ -31,7 +31,7 @@ class CollectionEngine:
     #而且分钟报表和小时报表的数据结构不同，肯定是要做筛选的
     
 
-    def is_entry_valid(self, entry, name, target_time_str):
+    def is_entry_valid(self, entry, name, target_time_str,data_type):
         """
         核心校验函数：判断单条数据行是否可以入库
         逻辑：
@@ -40,7 +40,7 @@ class CollectionEngine:
         """
         #逻辑更改，网站上设备的数据，即使是停机状态，也不会为-
         #所以只要有-的数据，就是非法的，不用判断是否停机
-        stop_type = entry.get('stop-stopDcsType', '-')
+        #stop_type = entry.get('stop-stopDcsType', '-')
         
         # 逻辑 1：设备已知停机
         # 不用这个逻辑去判断
@@ -54,12 +54,15 @@ class CollectionEngine:
         nox_val = entry.get('a21026-cou') or entry.get('a21026-avg') or "-"
         
         if nox_val == "-":
-            logging.warning(f"[{name}] {target_time_str} 运行中但关键指标未结算('-')，校验失败")
+            logging.warning(f"[{name}]的{data_type}报表在时间 {target_time_str} 关键指标未结算('-')，校验失败")
             return False
         
         return True
 
+   
     def fetch_and_store(self, target_time, name, port_id,data_type):
+        #增加一个table_name的参数，用来方便输出哪个表的什么时间数据校验出现异常
+        table_name= ""
         """执行单次数据抓取与入库"""
 
         """增强版：带有数据质量校验的抓取"""
@@ -80,12 +83,13 @@ class CollectionEngine:
             # 小时报表：延后5分钟以确保数据已生成
             delay = 5
             end_time = (target_time + timedelta(minutes=delay)).strftime('%Y-%m-%d %H:%M:%S')
+            table_name= "小时表"
         else:
             # 分钟报表：经过实际观察，每台锅炉的分钟报表延后时间不等，最长的延后5分钟
             # 小时报表：延后5分钟以确保数据已生成
             delay = 2 
             end_time = (target_time + timedelta(minutes=delay)).strftime('%Y-%m-%d %H:%M:%S')
-
+            table_name= "分钟表"
 
         #异常重试逻辑
         #数据校验失败后，不写入数据库，由start_service中每5分钟一次的扫盲去补全
@@ -144,7 +148,7 @@ class CollectionEngine:
                 #====将上面的数据行有效性逻辑提炼出去形成单独的is_entry_valid函数   
                 # 使用提炼后的校验函数
 
-                if self.is_entry_valid(entry, name, begin_time):
+                if self.is_entry_valid(entry, name, begin_time,table_name):
                     self.db.save_entry(name, entry, data_type)
                     logging.info(f"[{name}] {begin_time} 数据入库成功")
                     return True
@@ -161,7 +165,7 @@ class CollectionEngine:
 
 
     def sync_hourly(self):
-        logging.info(">>> 正在检查历史数据完整性...")
+        logging.info(">>> 正在检查小时表历史数据完整性...")
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
         latest_available = now - timedelta(hours=1)
 
@@ -181,9 +185,9 @@ class CollectionEngine:
                 else:
                     # 如果这个时间点死活采不到（比如网站还没出数），
                     # 停止补齐当前设备，防止后面全是空跑，等下次轮询再试
-                    logging.warning(f"[{name}] {check_time} 补齐中断，等待下次同步")
+                    logging.warning(f"[{name}] {check_time} 小时表补齐中断，等待下次同步")
                     break 
-        logging.info(">>> 历史数据自检完成。")
+        logging.info(">>> 小时表历史数据自检完成。")
 
     def sync_minutes(self):
         """
@@ -203,7 +207,7 @@ class CollectionEngine:
         token = AuthManager.get_local_token()
         data_type = settings.DATA_TYPES["MINUTE"]
 
-        logging.info(f">>> 开始自动同步分钟数据窗口: {begin_str} 至 {end_str}")
+        logging.info(f">>> 开始自动同步分钟表数据窗口: {begin_str} 至 {end_str}")
 
         # 3. 遍历设备进行批量抓取
         for name, port_id in self.devices.items():
@@ -221,11 +225,11 @@ class CollectionEngine:
                         
                         # 4. 数据有效性校验：复用你之前提炼的校验函数
                         # 确保只有结算完成（非 "-"）的数据才入库
-                        if self.is_entry_valid(entry, name, entry_time):
+                        if self.is_entry_valid(entry, name, entry_time,settings.DATA_TYPES["MINUTE"]):
                             if self.db.save_entry(name, entry, data_type):
                                 count += 1
                                 
-                    logging.info(f"[{name}] 窗口内发现 {len(data_list)} 条数据，成功入库/更新 {count} 条")
+                    logging.info(f"[{name}] 窗口内发现 {len(data_list)} 条数据，成功入分钟表/更新 {count} 条")
                 else:
                     logging.warning(f"[{name}] 在该时间段内未查询到任何分钟数据")
                     
@@ -275,7 +279,7 @@ class CollectionEngine:
                     while curr <= check_end:
                         t_str = curr.strftime('%Y-%m-%d %H:%M:%S')
                         if t_str not in existing_set:
-                            logging.info(f"发现空档: [{name}] {t_str}，正在补采...")
+                            logging.info(f"发现小时表空档: [{name}] {t_str}，正在补采...")
                             self.fetch_and_store(curr, name, port_id, h_type)
                         curr += timedelta(hours=1)
 

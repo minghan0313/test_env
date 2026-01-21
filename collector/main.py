@@ -2,9 +2,7 @@
 import sys
 from pathlib import Path
 
-# 获取当前文件的爷爷目录（即项目根目录）
-# __file__ 是 collector/main.py
-# .resolve().parents[1] 就是项目根目录 Auto/
+# --- 自动寻找项目根目录，确保程序能找到 core 和 utils 文件夹 ---
 root_path = str(Path(__file__).resolve().parents[1])
 
 if root_path not in sys.path:
@@ -15,14 +13,16 @@ from auth_manager import AuthManager
 from collection_engine import CollectionEngine
 
 def main():
-    print("=== 环保数据采集后台服务启动 ===")
+    print("========================================")
+    print("   热电厂环保数据自动采集系统 启动中... ")
+    print("========================================")
 
     # 1. 基础环境校验
     # 启动前先确保 Token 能拿通，如果这里报错，说明网络或账号有问题，直接报错提醒人工干预
-    print("正在校验登录凭证...")
+    print("[检查] 正在校验登录凭证...")
     token = AuthManager.get_local_token()
     if not token:
-        print("致命错误：无法获取有效 Token，请检查账号配置或网络状态。")
+        print("[错误] 无法获取有效登录凭证，请检查网络或 settings.py 中的账号配置。")
         return
 
     # 2. 实例化采集引擎
@@ -34,7 +34,7 @@ def main():
         # 这一步会根据数据库 MAX(time) 自动追平所有历史缺失数据
         engine.sync_hourly() 
         
-        # 4. 启动实时采集服务 (持久运行)
+        # 4. 开启实时守护模式
         # 这里会进入你设计的每小时 02 分执行的死循环
         print(">>> 后台采集引擎已进入就绪状态。")
         engine.start_service()
